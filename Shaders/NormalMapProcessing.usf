@@ -1,0 +1,27 @@
+
+#include "/Engine/Private/Common.ush"
+#include "/Engine/Private/ScreenPass.ush"
+
+SCREEN_PASS_TEXTURE_VIEWPORT(OutViewPort)
+SCREEN_PASS_TEXTURE_VIEWPORT(InViewPort)
+
+Texture2D InTex;
+SamplerState sampler0;
+
+float4x4 ViewLocalToWorld;
+
+
+float4 VisualizeNormalMapPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	float3 Normal = InTex.Sample(sampler0, InUV).xyz;
+
+#if VIEW_WORLD_SPACE
+	Normal = mul(float4(Normal, 0.0f), ViewLocalToWorld).xyz;
+#endif
+
+	Normal = (Normal + 1.0f) * 0.5f;
+	
+	return float4(Normal, 1);
+}

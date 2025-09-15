@@ -1,0 +1,53 @@
+#include "/Engine/Private/Common.ush"
+#include "/Engine/Private/ScreenPass.ush"
+
+SCREEN_PASS_TEXTURE_VIEWPORT(OutViewPort)
+SCREEN_PASS_TEXTURE_VIEWPORT(InViewPort)
+
+Texture2D<float4> CameraColorTexture;
+Texture2D<float4> CameraDepthTexture;
+SamplerState sampler0;
+
+Texture3D IntegratedLightScattering;
+SamplerState IntegratedLightScatteringSampler;
+
+float VolumetricFogStartDistance;
+float3 VolumetricFogInvGridSize;
+float3 VolumetricFogGridZParams;
+float2 VolumetricFogSVPosToVolumeUV;
+float2 VolumetricFogUVMax;
+float OneOverPreExposure;
+
+/*
+ * Based on excerpts from HeightFogPixelShader.usf and HeightFogCommon.ush
+ */
+float4 VolumetricCompositionPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	float2 SVPos = InUV * OutViewPort_Extent + OutViewPort_ViewportMin;
+
+	float4 Color = CameraColorTexture.Sample(sampler0, InUV);
+	float SceneDepth = CameraDepthTexture.Sample(sampler0, InUV);
+
+	// Calculate Z slice
+	float ZSlice = log2(SceneDepth * VolumetricFogGridZParams.x + VolumetricFogGridZParams.y) * VolumetricFogGridZParams.z * VolumetricFogInvGridSize.z;
+
+	// Calculate volume UV
+	float3 VolumeUV = float3((SVPos.xy - OutViewPort_ViewportMin) * VolumetricFogSVPosToVolumeUV, ZSlice);
+	VolumeUV.xy = min(VolumeUV.xy, VolumetricFogUVMax);
+
+	// Sample volume
+	float4 VolumetricFogLookup = Texture3DSampleLevel(IntegratedLightScattering, IntegratedLightScatteringSampler, VolumeUV, 0);
+
+	// IntegratedLightScattering is pre-exposed, remove pre exposure now so that it can correctly be applied later
+	VolumetricFogLookup.rgb *= OneOverPreExposure;
+
+	VolumetricFogLookup = lerp(float4(0, 0, 0, 1), VolumetricFogLookup, saturate((SceneDepth - VolumetricFogStartDistance) * 100000000.0f));
+
+	// Apply volumetric fog
+	// VolumetricFogLookup has radiance in RGB and Transmittance in alpha
+	float3 CompositedColor = Color.rgb * VolumetricFogLookup.a + VolumetricFogLookup.rgb;
+
+	return float4(CompositedColor, 1.0f);
+}

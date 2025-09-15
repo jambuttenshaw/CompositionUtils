@@ -1,0 +1,163 @@
+#include "/Engine/Private/Common.ush"
+#include "/Engine/Private/ScreenPass.ush"
+
+#include "/Engine/Private/DeferredShadingCommon.ush"
+
+#ifndef COlOR_SOURCE_DEPTH_CAMERA
+#define COlOR_SOURCE_DEPTH_CAMERA 1
+#endif
+
+
+SCREEN_PASS_TEXTURE_VIEWPORT(InputViewPort)
+SCREEN_PASS_TEXTURE_VIEWPORT(OutputViewPort)
+
+Texture2D<float4> CameraColorTexture;
+Texture2D<float4> CameraDepthTexture;
+Texture2D<float4> CameraNormalsTexture;
+
+Texture2D<float2> ReprojectionUVMap;
+
+float4x4 VirtualCameraLocalToWorld;
+float4x4 VirtualCameraViewToNDC;
+float4x4 VirtualCameraNDCToView;
+
+float4x4 DepthCameraViewToNDC;
+float4x4 DepthCameraNDCToView;
+
+// Parameters to customize how the lighting affects the camera image
+float AmbientMultiplier;
+float AlbedoMultiplier;
+
+float RoughnessOverride;
+float SpecularOverride;
+
+
+void InjectCameraFeedPS(
+	float2 InUV : TEXCOORD0,
+	float4 SvPosition : SV_Position
+
+#if PIXELSHADEROUTPUT_MRT0
+	, out float4 OutTarget0 : SV_Target0
+#endif
+
+#if PIXELSHADEROUTPUT_MRT1
+	, out float4 OutTarget1 : SV_Target1
+#endif
+
+#if PIXELSHADEROUTPUT_MRT2
+	, out float4 OutTarget2 : SV_Target2
+#endif
+
+#if PIXELSHADEROUTPUT_MRT3
+	, out float4 OutTarget3 : SV_Target3
+#endif
+
+#if PIXELSHADEROUTPUT_MRT4
+	, out float4 OutTarget4 : SV_Target4
+#endif
+
+#if PIXELSHADEROUTPUT_MRT5
+	, out float4 OutTarget5 : SV_Target5
+#endif
+
+#if PIXELSHADEROUTPUT_MRT6
+	, out float4 OutTarget6 : SV_Target6
+#endif
+
+#if PIXELSHADEROUTPUT_MRT7
+	, out float4 OutTarget7 : SV_Target7
+#endif
+
+	, out float OutDepth : SV_Depth
+)
+{
+	// Perform texture re-projection
+	// As described: https://dev.intelrealsense.com/docs/projection-texture-mapping-and-occlusion-with-intel-realsense-depth-cameras#32-texture-mapping
+	// TODO: Is bilinear filtering appropriate?
+	float2 DepthCameraUV = ReprojectionUVMap.Sample(View.SharedBilinearClampedSampler, InUV).rg;
+	if (any(DepthCameraUV < 0.0f))
+	{
+		// This point is out of the view of the depth camera
+		discard;
+	}
+
+	const float4 CameraDepthData = CameraDepthTexture.Sample(View.SharedBilinearClampedSampler, DepthCameraUV);
+
+	const bool bDepthValid = CameraDepthData.a != 0;
+	if (!bDepthValid)
+	{
+		// No volume exists for this pixel
+		discard;
+	}
+	const float DeviceZ = ConvertToDeviceZ(CameraDepthData.r);
+
+	// If using depth camera for colour image, then use DepthCameraUV. If using main camera for colour image, then use InUV
+	const float3 CameraColor = CameraColorTexture.Sample(View.SharedBilinearClampedSampler,
+#if COlOR_SOURCE_DEPTH_CAMERA
+		DepthCameraUV
+#else
+		InUV
+#endif
+		).rgb;
+	float3 Albedo = CameraColor * AlbedoMultiplier;
+
+	float3 ViewSpaceNormal = normalize(CameraNormalsTexture.Sample(View.SharedBilinearClampedSampler, DepthCameraUV).rgb);
+	float3 WorldSpaceNormal = mul(float4(ViewSpaceNormal, 0.0f), VirtualCameraLocalToWorld).rgb;
+
+	// Encode into GBuffer data
+	FGBufferData
+	GBufferData = (FGBufferData) 0;
+	GBufferData.Depth = DeviceZ;
+	GBufferData.WorldNormal = WorldSpaceNormal;
+	GBufferData.DiffuseColor = Albedo;
+	GBufferData.SpecularColor = 0.0f;
+	GBufferData.BaseColor = Albedo;
+	GBufferData.Metallic = 0.0f;
+	GBufferData.Specular = SpecularOverride;
+	GBufferData.Roughness = RoughnessOverride;
+	GBufferData.ShadingModelID = SHADINGMODELID_DEFAULT_LIT;
+	//GBufferData.ShadingModelID = SHADINGMODELID_UNLIT;
+	GBufferData.Velocity = 0.0f;
+	GBufferData.GenericAO = 1.0f;
+
+	// Encode data into MRT format
+	FPixelShaderOut PSOut;
+	EncodeGBufferToMRT(PSOut, GBufferData, /* QuantizationBias = */0.0f);
+
+	PSOut.MRT[0].rgb = CameraColor * AmbientMultiplier;
+	
+	// OutDepth will be compared using CF_GREATER
+	OutDepth = GBufferData.Depth;
+
+#if PIXELSHADEROUTPUT_MRT0
+	OutTarget0 = PSOut.MRT[0];
+#endif
+
+#if PIXELSHADEROUTPUT_MRT1
+	OutTarget1 = PSOut.MRT[1];
+#endif
+
+#if PIXELSHADEROUTPUT_MRT2
+	OutTarget2 = PSOut.MRT[2];
+#endif
+
+#if PIXELSHADEROUTPUT_MRT3
+	OutTarget3 = PSOut.MRT[3];
+#endif
+
+#if PIXELSHADEROUTPUT_MRT4
+	OutTarget4 = PSOut.MRT[4];
+#endif
+
+#if PIXELSHADEROUTPUT_MRT5
+	OutTarget5 = PSOut.MRT[5];
+#endif
+
+#if PIXELSHADEROUTPUT_MRT6
+	OutTarget6 = PSOut.MRT[6];
+#endif
+
+#if PIXELSHADEROUTPUT_MRT7
+	OutTarget7 = PSOut.MRT[7];
+#endif
+}

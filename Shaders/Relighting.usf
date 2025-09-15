@@ -1,0 +1,36 @@
+#include "/Engine/Private/Common.ush"
+#include "/Engine/Private/ScreenPass.ush"
+
+SCREEN_PASS_TEXTURE_VIEWPORT(OutViewPort)
+SCREEN_PASS_TEXTURE_VIEWPORT(InViewPort)
+
+Texture2D<float4> CameraColorTexture;
+Texture2D<float4> CameraDepthTexture;
+Texture2D<float4> CameraNormalTexture;
+SamplerState sampler0;
+
+float3 LightColor;
+float3 LightDirection;
+
+float4x4 CameraLocalToWorld;
+float4x4 CameraWorldToLocal;
+
+// Empirically adjust virtual / real light contribution until delighting is implemented
+float LightWeight;
+
+
+float4 RelightingPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	float4 InColor = CameraColorTexture.Sample(sampler0, InUV);
+
+	float3 ViewSpaceNormal = normalize(CameraNormalTexture.Sample(sampler0, InUV).rgb);
+	float3 WorldSpaceNormal = mul(float4(ViewSpaceNormal, 0.0f), CameraLocalToWorld).rgb;
+
+	float3 LightContrib = LightColor * saturate(dot(-LightDirection, WorldSpaceNormal));
+	float3 Albedo = InColor.rgb;
+
+	InColor.rgb += (Albedo * LightContrib * LightWeight);
+	return InColor;
+}

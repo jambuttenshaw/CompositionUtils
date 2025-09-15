@@ -1,0 +1,156 @@
+#include "/Engine/Private/Common.ush"
+#include "/Engine/Private/ScreenPass.ush"
+
+SCREEN_PASS_TEXTURE_VIEWPORT(OutViewPort)
+SCREEN_PASS_TEXTURE_VIEWPORT(InViewPort)
+
+
+Texture2D InTex;
+SamplerState sampler0; // Bilinear sampler to perform interpolation
+
+
+// Ensures that the texture is set up correctly for use in the rest of the pipeline
+float4 PreProcessDepthPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	float4 D = InTex.Sample(sampler0, InUV);
+
+	// Could be +/- inf if invalid data
+	D = (any(abs(D) == POSITIVE_INFINITY) || any(isnan(D))) ? float4(0, 0, 0, 1) : float4(D.xxx, 0.0f);
+
+	return D; // Alpha channel indicates missing depth data
+}
+
+
+float4 RestrictPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	int2 PixelCoord = InUV * InViewPort_Extent;
+
+	float4 Sum = 0.0f;
+	float4 Temp;
+
+	Temp = InTex[PixelCoord + int2(0, 0)]; if(Temp.w > 0) { Sum += Temp; }
+	Temp = InTex[PixelCoord + int2(1, 0)]; if(Temp.w > 0) { Sum += Temp; }
+	Temp = InTex[PixelCoord + int2(0, 1)]; if(Temp.w > 0) { Sum += Temp; }
+	Temp = InTex[PixelCoord + int2(1, 1)]; if(Temp.w > 0) { Sum += Temp; }
+
+	if (Sum.w > 0)
+	{
+		Sum /= Sum.w;
+	}
+
+	return Sum;
+}
+
+
+float4 InterpolatePS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	int2 PixelCoord = InUV * InViewPort_Extent;
+
+	float4 D = InTex[PixelCoord];
+
+	// Non-boundary pixels should bilinearly interpolate
+	if (D.w < 1)
+	{
+		D = InTex.Sample(sampler0, InUV);
+		D.w = 0;
+	}
+
+	return D;
+}
+
+
+float4 JacobiStepPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	const float2 UVStep = InViewPort_ExtentInverse;
+
+	// Use point clamped sampler
+	float4 D = InTex.Sample(sampler0, InUV);
+	if (D.w > 0)
+	{
+		D  = InTex.Sample(sampler0, InUV + UVStep * int2(1, 0));
+		D += InTex.Sample(sampler0, InUV + UVStep * int2(-1, 0));
+		D += InTex.Sample(sampler0, InUV + UVStep * int2(0, 1));
+		D += InTex.Sample(sampler0, InUV + UVStep * int2(0, -1));
+		D *= 0.25f;
+		D.w = 1;
+	}
+
+	return D;
+}
+
+
+// Camera matrix of Stereolabs camera to project into view space - to compare against planes
+float4x4 InvCameraProjectionMatrix;
+float CameraNearClippingPlane;
+// All depth values beyond this distance will be clipped
+int bEnableFarClipping;
+float FarClipDistance;
+// All depth values on the other side of this plane will be clipped
+int bEnableClippingPlane;
+float4 UserClippingPlane;
+
+
+float4 DepthClipPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	// Sample depth at location
+	float4 D = InTex.Sample(sampler0, InUV);
+
+	if (all(D.rgb == 0.0f))
+	{
+		// Depth is INVALID (depth reconstruction marks invalid areas with alpha=1)
+		// The rest of the pipeline expects invalid areas to be transparent
+		// Also set color channels to 0 for clarity, though they probably already are anyway
+		return float4(1e10, 1e10, 1e10, 0.0f);
+	}
+
+	// All invalid depths from reconstruction have been processed - mark depth as VALID until found otherwise
+	D.w = 1.0f;
+
+	// Un-project into view-space
+	float2 NDCSpacePos = (InUV - 0.5f) * 2.0f * float2(1, -1);
+
+	float4 PosOnNearPlane = mul(float4(NDCSpacePos, 1, 1), InvCameraProjectionMatrix);
+	float3 DirToNearPlane = PosOnNearPlane.xyz / (PosOnNearPlane.w * CameraNearClippingPlane);
+
+	float3 ViewSpacePos = DirToNearPlane * D.x;
+
+	// Clip against user-defined clipping planes
+	D.w *= saturate(bEnableClippingPlane) * dot(ViewSpacePos.xyz, UserClippingPlane.xyz) - UserClippingPlane.w > 0;
+
+	// Clip against far plane
+	D.w *= saturate(bEnableFarClipping) * D.x < FarClipDistance;
+
+	// NOTE: Clipped pixels (with D.w == 0) still keep their original depth value - this prevents artefacts in case of sampling the depth texture with bilinear filtering
+	return D;
+}
+
+
+float2 DepthRange;
+
+
+float4 VisualizeDepthPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	float4 Depth = InTex.Sample(sampler0, InUV);
+	float DepthValue = Depth.r;
+	bool bDepthValid = Depth.a != 0.0f;
+
+	if (!bDepthValid)
+	{
+		return float4(1, 0, 1, 1);
+	}
+
+	float MappedDepth = saturate((DepthValue - DepthRange.x) / (DepthRange.y - DepthRange.x));
+	return float4(MappedDepth.xxx, 1);
+}
