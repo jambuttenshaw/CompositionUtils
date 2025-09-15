@@ -1,6 +1,6 @@
-#include "SlCompPipelines.h"
+#include "CompUtilsPipelines.h"
 
-DECLARE_GPU_STAT_NAMED(SlCompVolumetricCompositionStat, TEXT("SlCompVolumetricComposition"));
+DECLARE_GPU_STAT_NAMED(CompUtilsVolumetricCompositionStat, TEXT("CompUtilsVolumetricComposition"));
 
 
 class FVolumetricCompositionPS : public FGlobalShader
@@ -30,10 +30,10 @@ class FVolumetricCompositionPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FVolumetricCompositionPS, "/Plugin/StereolabsCompositing/VolumetricComposition.usf", "VolumetricCompositionPS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FVolumetricCompositionPS, "/Plugin/CompositionUtils/VolumetricComposition.usf", "VolumetricCompositionPS", SF_Pixel);
 
 
-void StereolabsCompositing::ExecuteVolumetricsCompositionPipeline(
+void CompositionUtils::ExecuteVolumetricsCompositionPipeline(
 	FRDGBuilder& GraphBuilder,
 	const FVolumetricsCompositionParametersProxy& Parameters,
 	FRDGTextureRef InTexture,
@@ -43,15 +43,15 @@ void StereolabsCompositing::ExecuteVolumetricsCompositionPipeline(
 	check(IsInRenderingThread());
 	check(Parameters.IsValid());
 
-	RDG_EVENT_SCOPE_STAT(GraphBuilder, SlCompVolumetricCompositionStat, "SlCompVolumetricComposition");
-	RDG_GPU_STAT_SCOPE(GraphBuilder, SlCompVolumetricCompositionStat);
-	SCOPED_NAMED_EVENT(SlCompVolumetricCompositionStat, FColor::Purple);
+	RDG_EVENT_SCOPE_STAT(GraphBuilder, CompUtilsVolumetricCompositionStat, "CompUtilsVolumetricComposition");
+	RDG_GPU_STAT_SCOPE(GraphBuilder, CompUtilsVolumetricCompositionStat);
+	SCOPED_NAMED_EVENT(CompUtilsVolumetricCompositionStat, FColor::Purple);
 
 	FRDGTextureRef IntegratedLightScatteringTexture = GraphBuilder.RegisterExternalTexture(Parameters.VolumetricFogData->IntegratedLightScatteringTexture);
 
-	StereolabsCompositing::AddPass<FVolumetricCompositionPS, TStaticSamplerState<SF_Bilinear>>(
+	CompositionUtils::AddPass<FVolumetricCompositionPS, TStaticSamplerState<SF_Bilinear>>(
 		GraphBuilder,
-		RDG_EVENT_NAME("SlCompVolumetricComposition"),
+		RDG_EVENT_NAME("CompUtilsVolumetricComposition"),
 		OutTexture,
 		[&](auto PassParameters)
 		{

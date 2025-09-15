@@ -83,7 +83,9 @@ struct FRelightingParametersProxy
 };
 
 
-namespace StereolabsCompositing
+struct FCameraTexturesProxy;
+
+namespace CompositionUtils
 {
 
 	void ExecuteDepthProcessingPipeline(
@@ -105,6 +107,7 @@ namespace StereolabsCompositing
 		FRDGBuilder& GraphBuilder,
 		const FMinimalViewInfo& VirtualCameraView,
 		FIntPoint TextureExtent,
+		const FCameraTexturesProxy& CameraTextures,
 		bool bPassThough = false // Optionally pass through - debug tool to enable / disable reprojection
 	);
 

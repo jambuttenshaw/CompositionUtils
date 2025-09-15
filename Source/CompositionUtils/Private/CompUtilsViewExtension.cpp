@@ -1,13 +1,12 @@
-#include "SlCompViewExtension.h"
+#include "CompUtilsViewExtension.h"
 
-#include "Composure/SlCompCaptureBase.h"
+#include "Composure/CompUtilsCaptureBase.h"
 #include "ScreenPass.h"
 
 #include "RenderGraphBuilder.h"
 #include "SceneRendering.h"
-#include "SlCompEngineSubsystem.h"
 #include "Components/SceneCaptureComponent2D.h"
-#include "Pipelines/SlCompPipelines.h"
+#include "Pipelines/CompUtilsPipelines.h"
 
 
 class FCameraFeedInjectionPS : public FGlobalShader
@@ -62,17 +61,22 @@ class FCameraFeedInjectionPS : public FGlobalShader
 	}
 };
 
-IMPLEMENT_GLOBAL_SHADER(FCameraFeedInjectionPS, "/Plugin/StereolabsCompositing/CameraFeedInjection.usf", "InjectCameraFeedPS", SF_Pixel)
+IMPLEMENT_GLOBAL_SHADER(FCameraFeedInjectionPS, "/Plugin/CompositionUtils/CameraFeedInjection.usf", "InjectCameraFeedPS", SF_Pixel)
 
 
-FSlCompViewExtension::FSlCompViewExtension(AStereolabsCompositingCaptureBase* Owner)
+FCompUtilsViewExtension::FCompUtilsViewExtension(ACompositionUtilsCaptureBase* Owner)
 	: CaptureActor(Owner)
 {
 	check(Owner);
 }
 
 
-void FSlCompViewExtension::PostRenderBasePassDeferred_RenderThread(FRDGBuilder& GraphBuilder, FSceneView& InView, const FRenderTargetBindingSlots& RenderTargets, TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures)
+void FCompUtilsViewExtension::PostRenderBasePassDeferred_RenderThread(
+	FRDGBuilder& GraphBuilder, 
+	FSceneView& InView, 
+	const FRenderTargetBindingSlots& RenderTargets, 
+	TRDGUniformBufferRef<FSceneTextureUniformParameters> SceneTextures
+)
 {
 	check(InView.bIsSceneCapture && InView.bIsViewInfo && CaptureActor.IsValid());
 
@@ -82,7 +86,7 @@ void FSlCompViewExtension::PostRenderBasePassDeferred_RenderThread(FRDGBuilder& 
 	}
 }
 
-void FSlCompViewExtension::PostRenderView_RenderThread(FRDGBuilder& GraphBuilder, FSceneView& View)
+void FCompUtilsViewExtension::PostRenderView_RenderThread(FRDGBuilder& GraphBuilder, FSceneView& View)
 {
 	check(View.bIsSceneCapture && View.bIsViewInfo && CaptureActor.IsValid());
 
@@ -93,14 +97,14 @@ void FSlCompViewExtension::PostRenderView_RenderThread(FRDGBuilder& GraphBuilder
 }
 
 
-void FSlCompViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FSceneView& View) const
+void FCompUtilsViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FSceneView& View) const
 {
 	check(View.bIsSceneCapture && View.bIsViewInfo && CaptureActor.IsValid());
 	FViewInfo& ViewInfo = static_cast<FViewInfo&>(View);
 
 	// Get camera images and insert them into GBuffer
 	// Some of these textures may be nullptr, must check for that later
-	const FStereolabsCameraTexturesProxy& CameraTextures = CaptureActor->GetCameraTextures_RenderThread();
+	const FCameraTexturesProxy& CameraTextures = CaptureActor->GetCameraTextures_RenderThread();
 
 	bool bAllValid = CameraTextures.ColorTexture != nullptr
 		&& CameraTextures.DepthTexture != nullptr
@@ -127,10 +131,11 @@ void FSlCompViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FSceneVie
 			static_cast<int32>(CameraTextures.DepthTexture->GetResource()->GetSizeY())
 		};
 
-		ReprojectionUVMap = StereolabsCompositing::CreateReprojectionUVMap(
+		ReprojectionUVMap = CompositionUtils::CreateReprojectionUVMap(
 			GraphBuilder,
 			VirtualCameraView,
 			TextureExtent,
+			CameraTextures,
 			CaptureActor->bDisableReprojectionUVMap
 		);
 	}
@@ -163,9 +168,8 @@ void FSlCompViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FSceneVie
 
 		// Get physical depth camera properties
 		{
-			USlCompEngineSubsystem* Subsystem = GEngine->GetEngineSubsystem<USlCompEngineSubsystem>();
-			PassParameters->DepthCameraViewToNDC = static_cast<FMatrix44f>(Subsystem->GetProjectionMatrix());
-			PassParameters->DepthCameraNDCToView = static_cast<FMatrix44f>(Subsystem->GetInvProjectionMatrix());
+			PassParameters->DepthCameraViewToNDC = CameraTextures.ViewToNDCMatrix;
+			PassParameters->DepthCameraNDCToView = CameraTextures.NDCToViewMatrix;
 		}
 
 		PassParameters->AmbientMultiplier = CaptureActor->AmbientMultiplier;
@@ -205,7 +209,7 @@ void FSlCompViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FSceneVie
 
 		AddDrawScreenPass(
 			GraphBuilder,
-			RDG_EVENT_NAME("StereolabsCameraFeedInjection"),
+			RDG_EVENT_NAME("CompUtilsCameraFeedInjection"),
 			View,
 			ViewPort,
 			ViewPort,

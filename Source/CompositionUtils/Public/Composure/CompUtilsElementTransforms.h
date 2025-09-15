@@ -2,14 +2,16 @@
 
 #include "CoreMinimal.h"
 
+#include "CompositingElement.h"
+#include "CompUtilsElementInput.h"
 #include "CompositingElements/CompositingElementPasses.h"
 #include "Engine/DirectionalLight.h"
 
-#include "SlCompElementTransforms.generated.h"
+#include "CompUtilsElementTransforms.generated.h"
 
 
 UCLASS(BlueprintType, Blueprintable)
-class STEREOLABSCOMPOSITING_API UCompositingStereolabsDepthProcessingPass : public UCompositingElementTransform
+class COMPOSITIONUTILS_API UCompositionUtilsDepthProcessingPass : public UCompositingElementTransform
 {
 	GENERATED_BODY()
 
@@ -33,9 +35,14 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnableFloorClipping"))
 	float FloorClipDistance = 100.0f; // 100cm
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName"))
+	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;
+
 public:
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
 
+private:
+	TWeakObjectPtr<UCompositionUtilsAuxiliaryCameraInput> AuxiliaryCameraInput;
 };
 
 
@@ -43,7 +50,7 @@ public:
  * Composites volumetric fog from the scene onto the camera image, using the real-world depth
  */
 UCLASS(BlueprintType, Blueprintable)
-class STEREOLABSCOMPOSITING_API UCompositingStereolabsVolumetricsPass : public UCompositingElementTransform
+class COMPOSITIONUTILS_API UCompositionUtilsVolumetricsPass : public UCompositingElementTransform
 {		
 	GENERATED_BODY()
 
@@ -53,7 +60,7 @@ public:
 
 	/** Used to get resources from the scene renderer that are required for composing volumetric effects */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	TWeakObjectPtr<class AStereolabsCompositingCaptureBase> StereolabsCGLayer;
+	TWeakObjectPtr<class ACompositionUtilsCaptureBase> CompUtilsCGLayer;
 
 public:
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
@@ -65,7 +72,7 @@ public:
  * Applies light sources from the virtual world to the camera image
  */
 UCLASS(BlueprintType, Blueprintable)
-class STEREOLABSCOMPOSITING_API UCompositingStereolabsRelightingPass : public UCompositingElementTransform
+class COMPOSITIONUTILS_API UCompositionUtilsRelightingPass : public UCompositingElementTransform
 {
 	GENERATED_BODY()
 
@@ -93,7 +100,7 @@ public:
  * To be able to preview the depth image directly in the preview window
  */
 UCLASS(BlueprintType, Blueprintable)
-class STEREOLABSCOMPOSITING_API UCompositingStereolabsDepthPreviewPass : public UCompositingElementTransform
+class COMPOSITIONUTILS_API UCompositionUtilsDepthPreviewPass : public UCompositingElementTransform
 {
 	GENERATED_BODY()
 
@@ -102,17 +109,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled", ClampMin="0"))
 	FVector2D VisualizeDepthRange = { 0, 1000 };
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	bool bVisualizeReprojectionUVMap = true;
-
 public:
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
 
 private:
 
 	void ApplyVisualizeDepth(UTexture* Input, UTextureRenderTarget2D* RenderTarget) const;
-	void ApplyVisualizeReprojectionUVMap(UTexture* Input, UTextureRenderTarget2D* RenderTarget, ACameraActor* TargetCamera) const;
-
 };
 
 
@@ -120,7 +122,7 @@ private:
  *	For easier previewing and interpretation of the normal map in the composure preview window
  */
 UCLASS(BlueprintType, Blueprintable)
-class STEREOLABSCOMPOSITING_API UCompositionStereolabsNormalMapPreviewPass : public UCompositingElementTransform
+class COMPOSITIONUTILS_API UCompositionUtilsNormalMapPreviewPass : public UCompositingElementTransform
 {
 	GENERATED_BODY()
 

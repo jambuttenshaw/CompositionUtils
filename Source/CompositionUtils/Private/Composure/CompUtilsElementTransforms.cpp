@@ -1,20 +1,19 @@
-#include "Composure/SlCompElementTransforms.h"
+#include "Composure/CompUtilsElementTransforms.h"
 
 #include "RenderGraphBuilder.h"
 #include "CompositingElements/ICompositingTextureLookupTable.h"
 
-#include "SlCompEngineSubsystem.h"
-#include "Composure/SlCompCaptureBase.h"
-#include "Pipelines/SlCompPipelines.h"
+#include "Composure/CompUtilsCaptureBase.h"
+#include "Pipelines/CompUtilsPipelines.h"
 
 #include "Components/DirectionalLightComponent.h"
 
 
-///////////////////////////////////////////////
-// UCompositingStereolabsDepthProcessingPass //
-///////////////////////////////////////////////
+//////////////////////////////////////////
+// UCompositionUtilsDepthProcessingPass //
+//////////////////////////////////////////
 
-UTexture* UCompositingStereolabsDepthProcessingPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
+UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
 {
 	if (!Input)
 		return Input;
@@ -30,9 +29,31 @@ UTexture* UCompositingStereolabsDepthProcessingPass::ApplyTransform_Implementati
 
 	FDepthProcessingParametersProxy Params;
 
-	auto Subsystem = GEngine->GetEngineSubsystem<USlCompEngineSubsystem>();
-	Params.InvProjectionMatrix = FMatrix44f(Subsystem->GetInvProjectionMatrix());
-	Params.CameraNearClippingPlane = Subsystem->GetNearClippingPlane();
+	if (!AuxiliaryCameraInput.IsValid())
+	{
+		if (AuxiliaryCameraInputElement.IsValid())
+		{
+			UTexture* Unused;
+			if (UCompositingElementInput* InputPass = AuxiliaryCameraInputElement->FindInputPass(UCompositionUtilsAuxiliaryCameraInput::StaticClass(), Unused))
+			{
+				if (UCompositionUtilsAuxiliaryCameraInput* AuxiliaryCameraInputPass = Cast<UCompositionUtilsAuxiliaryCameraInput>(InputPass))
+				{
+					AuxiliaryCameraInput = AuxiliaryCameraInputPass;
+				}
+			}
+		}
+	}
+
+	if (AuxiliaryCameraInput.IsValid())
+	{
+		Params.InvProjectionMatrix = AuxiliaryCameraInput->GetInverseProjectionMatrix();
+		Params.CameraNearClippingPlane = AuxiliaryCameraInput->GetNearClippingPlane();
+	}
+	else
+	{
+		Params.InvProjectionMatrix = FMatrix44f::Identity;
+		Params.CameraNearClippingPlane = 10.0f;
+	}
 
 	Params.bEnableJacobiSteps = bEnableJacobi;
 	Params.NumJacobiSteps = NumJacobiSteps;
@@ -57,15 +78,15 @@ UTexture* UCompositingStereolabsDepthProcessingPass::ApplyTransform_Implementati
 		{
 			FRDGBuilder GraphBuilder(RHICmdList);
 
-			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("StereolabsDepthProcessingPass.Input"));
-			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("StereolabsDepthProcessingPass.Output"));
+			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("CompUtilsDepthProcessingPass.Input"));
+			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("CompUtilsDepthProcessingPass.Output"));
 
 			// Set up RDG resources
 			FRDGTextureRef InColorTexture = GraphBuilder.RegisterExternalTexture(InputRT);
 			FRDGTextureRef OutColorTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
 
 			// Execute pipeline
-			StereolabsCompositing::ExecuteDepthProcessingPipeline(
+			CompositionUtils::ExecuteDepthProcessingPipeline(
 				GraphBuilder,
 				Parameters,
 				InColorTexture,
@@ -81,13 +102,13 @@ UTexture* UCompositingStereolabsDepthProcessingPass::ApplyTransform_Implementati
 
 
 ///////////////////////////////////////////
-// UCompositingStereolabsVolumetricsPass //
+// UCompositionUtilsVolumetricsPass //
 ///////////////////////////////////////////
 
 
-UTexture* UCompositingStereolabsVolumetricsPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
+UTexture* UCompositionUtilsVolumetricsPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
 {
-	if (!Input || !StereolabsCGLayer.IsValid())
+	if (!Input || !CompUtilsCGLayer.IsValid())
 		return Input;
 	check(Input->GetResource());
 
@@ -100,7 +121,7 @@ UTexture* UCompositingStereolabsVolumetricsPass::ApplyTransform_Implementation(U
 		return Input;
 
 	FVolumetricsCompositionParametersProxy Params;
-	Params.VolumetricFogData = static_cast<const AStereolabsCompositingCaptureBase*>(StereolabsCGLayer.Get())->GetVolumetricFogData();
+	Params.VolumetricFogData = static_cast<const ACompositionUtilsCaptureBase*>(CompUtilsCGLayer.Get())->GetVolumetricFogData();
 	if (!Params.VolumetricFogData || !Params.VolumetricFogData->IntegratedLightScatteringTexture)
 		return Input;
 
@@ -115,15 +136,15 @@ UTexture* UCompositingStereolabsVolumetricsPass::ApplyTransform_Implementation(U
 		{
 			FRDGBuilder GraphBuilder(RHICmdList);
 
-			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("StereolabsVolumetricsPass.Input"));
-			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("StereolabsVolumetricsPass.Output"));
+			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("CompUtilsVolumetricsPass.Input"));
+			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("CompUtilsVolumetricsPass.Output"));
 
 			// Set up RDG resources
 			FRDGTextureRef InColorTexture = GraphBuilder.RegisterExternalTexture(InputRT);
 			FRDGTextureRef OutColorTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
 
 			// Execute pipeline
-			StereolabsCompositing::ExecuteVolumetricsCompositionPipeline(
+			CompositionUtils::ExecuteVolumetricsCompositionPipeline(
 				GraphBuilder,
 				Parameters,
 				InColorTexture,
@@ -138,11 +159,11 @@ UTexture* UCompositingStereolabsVolumetricsPass::ApplyTransform_Implementation(U
 
 
 //////////////////////////////////////////
-// UCompositingStereolabsRelightingPass //
+// UCompositionUtilsRelightingPass //
 //////////////////////////////////////////
 
 
-UTexture* UCompositingStereolabsRelightingPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
+UTexture* UCompositionUtilsRelightingPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
 {
 	if (!Input)
 		return Input;
@@ -182,15 +203,15 @@ UTexture* UCompositingStereolabsRelightingPass::ApplyTransform_Implementation(UT
 		{
 			FRDGBuilder GraphBuilder(RHICmdList);
 
-			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("StereolabsRelightingPass.Input"));
-			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("StereolabsRelightingPass.Output"));
+			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("CompUtilsRelightingPass.Input"));
+			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("CompUtilsRelightingPass.Output"));
 
 			// Set up RDG resources
 			FRDGTextureRef InColorTexture = GraphBuilder.RegisterExternalTexture(InputRT);
 			FRDGTextureRef OutColorTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
 
 			// Execute pipeline
-			StereolabsCompositing::ExecuteRelightingPipeline(
+			CompositionUtils::ExecuteRelightingPipeline(
 				GraphBuilder,
 				Parameters,
 				InColorTexture,
@@ -205,11 +226,11 @@ UTexture* UCompositingStereolabsRelightingPass::ApplyTransform_Implementation(UT
 
 
 ////////////////////////////////////////////
-// UCompositingStereolabsDepthPreviewPass //
+// UCompositionUtilsDepthPreviewPass //
 ////////////////////////////////////////////
 
 
-UTexture* UCompositingStereolabsDepthPreviewPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
+UTexture* UCompositionUtilsDepthPreviewPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
 {
 	if (!Input)
 		return Input;
@@ -226,19 +247,12 @@ UTexture* UCompositingStereolabsDepthPreviewPass::ApplyTransform_Implementation(
 	if (!(RenderTarget && RenderTarget->GetResource()))
 		return Input;
 
-	if (bVisualizeReprojectionUVMap)
-	{
-		ApplyVisualizeReprojectionUVMap(Input, RenderTarget, TargetCamera);
-	}
-	else
-	{
-		ApplyVisualizeDepth(Input, RenderTarget);
-	}
+	ApplyVisualizeDepth(Input, RenderTarget);
 
 	return RenderTarget;
 }
 
-void UCompositingStereolabsDepthPreviewPass::ApplyVisualizeDepth(UTexture* Input, UTextureRenderTarget2D* RenderTarget) const
+void UCompositionUtilsDepthPreviewPass::ApplyVisualizeDepth(UTexture* Input, UTextureRenderTarget2D* RenderTarget) const
 {
 	ENQUEUE_RENDER_COMMAND(ApplyDepthPreviewPass)(
 		[DepthRange = VisualizeDepthRange, InputResource = Input->GetResource(), OutputResource = RenderTarget->GetResource()]
@@ -246,12 +260,12 @@ void UCompositingStereolabsDepthPreviewPass::ApplyVisualizeDepth(UTexture* Input
 		{
 			FRDGBuilder GraphBuilder(RHICmdList);
 
-			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("StereolabsDepthPreviewPass.Input"));
-			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("StereolabsDepthPreviewPass.Output"));
+			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("CompUtilsDepthPreviewPass.Input"));
+			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("CompUtilsDepthPreviewPass.Output"));
 			FRDGTextureRef InTexture = GraphBuilder.RegisterExternalTexture(InputRT);
 			FRDGTextureRef OutTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
 
-			StereolabsCompositing::VisualizeProcessedDepth(
+			CompositionUtils::VisualizeProcessedDepth(
 				GraphBuilder,
 				static_cast<FVector2f>(DepthRange),
 				InTexture,
@@ -262,46 +276,12 @@ void UCompositingStereolabsDepthPreviewPass::ApplyVisualizeDepth(UTexture* Input
 		});
 }
 
-void UCompositingStereolabsDepthPreviewPass::ApplyVisualizeReprojectionUVMap(UTexture* Input, UTextureRenderTarget2D* RenderTarget, ACameraActor* TargetCamera) const
-{
-	ENQUEUE_RENDER_COMMAND(ApplyReprojectionUVMapPreviewPass)(
-		[TargetCamera, InputResource = Input->GetResource(), OutputResource = RenderTarget->GetResource()]
-		(FRHICommandListImmediate& RHICmdList)
-		{
-			FRDGBuilder GraphBuilder(RHICmdList);
-
-			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("StereolabsDepthPreviewPass.Output"));
-			FRDGTextureRef OutTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
-
-			FMinimalViewInfo VirtualCameraView;
-			TargetCamera->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
-
-			// Execute pipeline
-			FRDGTextureRef ReprojectionUVMap = StereolabsCompositing::CreateReprojectionUVMap(
-				GraphBuilder,
-				VirtualCameraView,
-				FIntPoint{
-					static_cast<int32>(InputResource->GetSizeX()),
-					static_cast<int32>(InputResource->GetSizeY())
-				}
-			);
-
-			StereolabsCompositing::VisualizeReprojectionUVMap(
-				GraphBuilder,
-				ReprojectionUVMap,
-				OutTexture
-			);
-
-			GraphBuilder.Execute();
-		});
-}
-
 
 ////////////////////////////////////////////////
-// UCompositionStereolabsNormalMapPreviewPass //
+// UCompositionUtilsNormalMapPreviewPass //
 ////////////////////////////////////////////////
 
-UTexture* UCompositionStereolabsNormalMapPreviewPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
+UTexture* UCompositionUtilsNormalMapPreviewPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
 {
 	if (!Input)
 		return Input;
@@ -333,12 +313,12 @@ UTexture* UCompositionStereolabsNormalMapPreviewPass::ApplyTransform_Implementat
 		{
 			FRDGBuilder GraphBuilder(RHICmdList);
 
-			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("StereolabsNormalMapPreviewPass.Input"));
-			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("StereolabsNormalMapPreviewPass.Output"));
+			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("CompUtilsNormalMapPreviewPass.Input"));
+			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("CompUtilsNormalMapPreviewPass.Output"));
 			FRDGTextureRef InTexture = GraphBuilder.RegisterExternalTexture(InputRT);
 			FRDGTextureRef OutTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
 
-			StereolabsCompositing::VisualizeNormalMap(
+			CompositionUtils::VisualizeNormalMap(
 				GraphBuilder,
 				bWorldSpace,
 				LocalToWorld,

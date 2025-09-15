@@ -3,16 +3,16 @@
 #include "SceneViewExtension.h"
 
 
-class AStereolabsCompositingCaptureBase;
+class ACompositionUtilsCaptureBase;
 
 
 // Inherits from ISceneViewExtension instead of FSceneViewExtensionBase because
 // we do not want to create this view extension through FSceneViewExtensions
-// We only want to create them for ASlCompCaptureBase actors
-class FSlCompViewExtension : public ISceneViewExtension
+// We only want to create them for ACompositionUtilsCaptureBase actors
+class FCompUtilsViewExtension : public ISceneViewExtension
 {
 public:
-	FSlCompViewExtension(AStereolabsCompositingCaptureBase* Owner);
+	FCompUtilsViewExtension(ACompositionUtilsCaptureBase* Owner);
 
 	//~ Begin ISceneViewExtension Interface
 
@@ -36,10 +36,10 @@ private:
 
 
 	void InjectCameraFeed(FRDGBuilder& GraphBuilder, FSceneView& View) const;
-	// Implemented in SlCompVolumetricFogExtraction.cpp
+	// Implemented in CompUtilsVolumetricFogExtraction.cpp
 	void ExtractVolumetricFog(FRDGBuilder& GraphBuilder, FSceneView& View) const;
 
 private:
 	// Should always be valid through the lifetime of this object or something has gone wrong
-	TWeakObjectPtr<AStereolabsCompositingCaptureBase> CaptureActor;
+	TWeakObjectPtr<ACompositionUtilsCaptureBase> CaptureActor;
 };

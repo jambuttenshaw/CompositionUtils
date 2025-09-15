@@ -1,9 +1,9 @@
-#include "SlCompPipelines.h"
+#include "CompUtilsPipelines.h"
 
 #include "ScreenPass.h"
 #include "LightSceneProxy.h"
 
-DECLARE_GPU_STAT_NAMED(SlCompRelightingStat, TEXT("SlCompRelighting"));
+DECLARE_GPU_STAT_NAMED(CompUtilsRelightingStat, TEXT("CompUtilsRelighting"));
 
 
 class FRelightingPS : public FGlobalShader
@@ -32,10 +32,10 @@ class FRelightingPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FRelightingPS, "/Plugin/StereolabsCompositing/Relighting.usf", "RelightingPS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FRelightingPS, "/Plugin/CompositionUtils/Relighting.usf", "RelightingPS", SF_Pixel);
 
 
-void StereolabsCompositing::ExecuteRelightingPipeline(
+void CompositionUtils::ExecuteRelightingPipeline(
 	FRDGBuilder& GraphBuilder,
 	const FRelightingParametersProxy& Parameters,
 	FRDGTextureRef InTexture,
@@ -45,13 +45,13 @@ void StereolabsCompositing::ExecuteRelightingPipeline(
 	check(IsInRenderingThread());
 	check(Parameters.IsValid());
 
-	RDG_EVENT_SCOPE_STAT(GraphBuilder, SlCompRelightingStat, "SlCompRelighting");
-	RDG_GPU_STAT_SCOPE(GraphBuilder, SlCompRelightingStat);
-	SCOPED_NAMED_EVENT(SlCompRelightingStat, FColor::Purple);
+	RDG_EVENT_SCOPE_STAT(GraphBuilder, CompUtilsRelightingStat, "CompUtilsRelighting");
+	RDG_GPU_STAT_SCOPE(GraphBuilder, CompUtilsRelightingStat);
+	SCOPED_NAMED_EVENT(CompUtilsRelightingStat, FColor::Purple);
 
-	StereolabsCompositing::AddPass<FRelightingPS, TStaticSamplerState<>>(
+	CompositionUtils::AddPass<FRelightingPS, TStaticSamplerState<>>(
 		GraphBuilder,
-		RDG_EVENT_NAME("SlCompRelighting"),
+		RDG_EVENT_NAME("CompUtilsRelighting"),
 		OutTexture,
 		[&](auto PassParameters)
 		{

@@ -1,5 +1,7 @@
-#include "SlCompEngineSubsystem.h"
-#include "SlCompPipelines.h"
+#include "CompUtilsPipelines.h"
+
+#include "Composure/CompUtilsCaptureBase.h"
+
 
 class FReprojectionUVMapPS : public FGlobalShader
 {
@@ -24,7 +26,7 @@ class FReprojectionUVMapPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FReprojectionUVMapPS, "/Plugin/StereolabsCompositing/ReprojectionUVMap.usf", "ReprojectionUVMapPS", SF_Pixel)
+IMPLEMENT_GLOBAL_SHADER(FReprojectionUVMapPS, "/Plugin/CompositionUtils/ReprojectionUVMap.usf", "ReprojectionUVMapPS", SF_Pixel)
 
 class FVisualizeReprojectionUVMapPS : public FGlobalShader
 {
@@ -42,10 +44,16 @@ class FVisualizeReprojectionUVMapPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FVisualizeReprojectionUVMapPS, "/Plugin/StereolabsCompositing/ReprojectionUVMap.usf", "VisualizeReprojectionUVMapPS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FVisualizeReprojectionUVMapPS, "/Plugin/CompositionUtils/ReprojectionUVMap.usf", "VisualizeReprojectionUVMapPS", SF_Pixel);
 
 
-FRDGTextureRef StereolabsCompositing::CreateReprojectionUVMap(FRDGBuilder& GraphBuilder, const FMinimalViewInfo& VirtualCameraView, FIntPoint TextureExtent, bool bPassThrough)
+FRDGTextureRef CompositionUtils::CreateReprojectionUVMap(
+	FRDGBuilder& GraphBuilder, 
+	const FMinimalViewInfo& VirtualCameraView, 
+	FIntPoint TextureExtent,
+	const FCameraTexturesProxy& CameraTextures,
+	bool bPassThrough
+)
 {
 	check(IsInRenderingThread());
 
@@ -54,7 +62,7 @@ FRDGTextureRef StereolabsCompositing::CreateReprojectionUVMap(FRDGBuilder& Graph
 		FRDGTextureDesc::Create2D(
 			TextureExtent,
 			PF_G16R16F, FClearValueBinding::None, ETextureCreateFlags::ShaderResource | ETextureCreateFlags::RenderTargetable),
-		TEXT("SlComp.ReprojectionUVMap")
+		TEXT("CompUtils.ReprojectionUVMap")
 	);
 
 	{
@@ -67,11 +75,9 @@ FRDGTextureRef StereolabsCompositing::CreateReprojectionUVMap(FRDGBuilder& Graph
 		}
 
 		{
-			// Get physical depth camera properties
-			USlCompEngineSubsystem* Subsystem = GEngine->GetEngineSubsystem<USlCompEngineSubsystem>();
-			PassParameters->DepthCameraViewToNDC = static_cast<FMatrix44f>(Subsystem->GetProjectionMatrix());
-			PassParameters->DepthCameraNDCToView = static_cast<FMatrix44f>(Subsystem->GetInvProjectionMatrix());
-			PassParameters->DepthCameraNearClippingPlane = Subsystem->GetNearClippingPlane();
+			PassParameters->DepthCameraViewToNDC = CameraTextures.ViewToNDCMatrix;
+			PassParameters->DepthCameraNDCToView = CameraTextures.NDCToViewMatrix;
+			PassParameters->DepthCameraNearClippingPlane = CameraTextures.NearClipPlane;
 
 			PassParameters->InvDepthCameraNodalOffset = FMatrix44f::Identity;
 		}
@@ -87,7 +93,7 @@ FRDGTextureRef StereolabsCompositing::CreateReprojectionUVMap(FRDGBuilder& Graph
 
 		AddDrawScreenPass(
 			GraphBuilder,
-			RDG_EVENT_NAME("StereolabsReprojectionUVMap"),
+			RDG_EVENT_NAME("CompUtilsReprojectionUVMap"),
 			FScreenPassViewInfo{ GMaxRHIFeatureLevel },
 			ViewPort,
 			ViewPort,
@@ -100,13 +106,13 @@ FRDGTextureRef StereolabsCompositing::CreateReprojectionUVMap(FRDGBuilder& Graph
 }
 
 
-void StereolabsCompositing::VisualizeReprojectionUVMap(FRDGBuilder& GraphBuilder, FRDGTextureRef ReprojectionUVMap, FRDGTextureRef OutTexture)
+void CompositionUtils::VisualizeReprojectionUVMap(FRDGBuilder& GraphBuilder, FRDGTextureRef ReprojectionUVMap, FRDGTextureRef OutTexture)
 {
 	check(IsInRenderingThread());
 
-	StereolabsCompositing::AddPass<FVisualizeReprojectionUVMapPS>(
+	CompositionUtils::AddPass<FVisualizeReprojectionUVMapPS>(
 		GraphBuilder,
-		RDG_EVENT_NAME("StereolabsVisualizeReprojectionUVMap"),
+		RDG_EVENT_NAME("CompUtilsVisualizeReprojectionUVMap"),
 		OutTexture,
 		[&](auto PassParameters)
 		{

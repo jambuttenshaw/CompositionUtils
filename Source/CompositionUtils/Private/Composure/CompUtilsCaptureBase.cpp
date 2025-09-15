@@ -1,43 +1,70 @@
-#include "Composure/SlCompCaptureBase.h"
+#include "Composure/CompUtilsCaptureBase.h"
 
-#include "SceneViewExtension.h"
-#include "SlCompViewExtension.h"
+#include "CompUtilsViewExtension.h"
 #include "Components/SceneCaptureComponent2D.h"
 
-#include "Pipelines/SlCompPipelines.h"
+#include "Pipelines/CompUtilsPipelines.h"
 
 
-AStereolabsCompositingCaptureBase::AStereolabsCompositingCaptureBase()
+ACompositionUtilsCaptureBase::ACompositionUtilsCaptureBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
 	if (!HasAnyFlags(RF_ClassDefaultObject))
 	{
-		SlCompViewExtension = MakeShared<FSlCompViewExtension>(this);
-		SceneCaptureComponent2D->SceneViewExtensions.Add(SlCompViewExtension);
+		CompUtilsViewExtension = MakeShared<FCompUtilsViewExtension>(this);
+		SceneCaptureComponent2D->SceneViewExtensions.Add(CompUtilsViewExtension);
 
 		VolumetricFogData_RenderThread = MakeShared<FVolumetricFogRequiredDataProxy>();
 	}
 }
 
-const FVolumetricFogRequiredDataProxy* AStereolabsCompositingCaptureBase::GetVolumetricFogData() const
+const FVolumetricFogRequiredDataProxy* ACompositionUtilsCaptureBase::GetVolumetricFogData() const
 {
 	return VolumetricFogData_RenderThread.Get();
 }
 
-FVolumetricFogRequiredDataProxy* AStereolabsCompositingCaptureBase::GetVolumetricFogData()
+FVolumetricFogRequiredDataProxy* ACompositionUtilsCaptureBase::GetVolumetricFogData()
 {
 	return VolumetricFogData_RenderThread.Get();
 }
 
-void AStereolabsCompositingCaptureBase::FetchLatestCameraTextures_GameThread()
+void ACompositionUtilsCaptureBase::FetchLatestCameraTextures_GameThread()
 {
 	check(!IsInRenderingThread());
 
-	FStereolabsCameraTexturesProxy Textures;
+	FCameraTexturesProxy Textures;
 	Textures.ColorTexture = FindNamedRenderResult(CameraColorPassName);
 	Textures.DepthTexture = FindNamedRenderResult(CameraDepthPassName);
 	Textures.NormalsTexture = FindNamedRenderResult(CameraNormalsPassName);
+
+	if (!AuxiliaryCameraInput.IsValid())
+	{
+		if (AuxiliaryCameraInputElement.IsValid())
+		{
+			UTexture* Unused;
+			if (UCompositingElementInput* InputPass = AuxiliaryCameraInputElement->FindInputPass(UCompositionUtilsAuxiliaryCameraInput::StaticClass(), Unused))
+			{
+				if (UCompositionUtilsAuxiliaryCameraInput* AuxiliaryCameraInputPass = Cast<UCompositionUtilsAuxiliaryCameraInput>(InputPass))
+				{
+					AuxiliaryCameraInput = AuxiliaryCameraInputPass;
+				}
+			}
+		}
+	}
+
+	if (AuxiliaryCameraInput.IsValid())
+	{
+		Textures.ViewToNDCMatrix = AuxiliaryCameraInput->GetProjectionMatrix();
+		Textures.NDCToViewMatrix = AuxiliaryCameraInput->GetInverseProjectionMatrix();
+		Textures.NearClipPlane = AuxiliaryCameraInput->GetNearClippingPlane();
+	}
+	else
+	{
+		Textures.ViewToNDCMatrix = FMatrix44f::Identity;
+		Textures.NDCToViewMatrix = FMatrix44f::Identity;
+		Textures.NearClipPlane = 10.0f;
+	}
 
 	ENQUEUE_RENDER_COMMAND(UpdateCameraTextures)(
 	[this, TempTextures = MoveTemp(Textures)](FRHICommandListImmediate&)
@@ -46,7 +73,7 @@ void AStereolabsCompositingCaptureBase::FetchLatestCameraTextures_GameThread()
 	});
 }
 
-const FStereolabsCameraTexturesProxy& AStereolabsCompositingCaptureBase::GetCameraTextures_RenderThread() const
+const FCameraTexturesProxy& ACompositionUtilsCaptureBase::GetCameraTextures_RenderThread() const
 {
 	check(IsInRenderingThread());
 	return CameraTextures_RenderThread;

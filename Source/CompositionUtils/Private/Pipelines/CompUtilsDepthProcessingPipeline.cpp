@@ -1,6 +1,6 @@
-#include "SlCompPipelines.h"
+#include "CompUtilsPipelines.h"
 
-DECLARE_GPU_STAT_NAMED(SlCompDepthProcessingStat, TEXT("SlCompDepthProcessing"));
+DECLARE_GPU_STAT_NAMED(CompUtilsDepthProcessingStat, TEXT("CompUtilsDepthProcessing"));
 
 
 class FPreProcessDepthPS : public FGlobalShader
@@ -19,7 +19,7 @@ class FPreProcessDepthPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FPreProcessDepthPS, "/Plugin/StereolabsCompositing/DepthProcessing.usf", "PreProcessDepthPS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FPreProcessDepthPS, "/Plugin/CompositionUtils/DepthProcessing.usf", "PreProcessDepthPS", SF_Pixel);
 
 
 class FRestrictPS : public FGlobalShader
@@ -38,7 +38,7 @@ class FRestrictPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FRestrictPS, "/Plugin/StereolabsCompositing/DepthProcessing.usf", "RestrictPS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FRestrictPS, "/Plugin/CompositionUtils/DepthProcessing.usf", "RestrictPS", SF_Pixel);
 
 
 class FInterpolatePS : public FGlobalShader
@@ -57,7 +57,7 @@ class FInterpolatePS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FInterpolatePS, "/Plugin/StereolabsCompositing/DepthProcessing.usf", "InterpolatePS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FInterpolatePS, "/Plugin/CompositionUtils/DepthProcessing.usf", "InterpolatePS", SF_Pixel);
 
 
 class FJacobiStepPS : public FGlobalShader
@@ -76,7 +76,7 @@ class FJacobiStepPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FJacobiStepPS, "/Plugin/StereolabsCompositing/DepthProcessing.usf", "JacobiStepPS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FJacobiStepPS, "/Plugin/CompositionUtils/DepthProcessing.usf", "JacobiStepPS", SF_Pixel);
 
 
 // Post-processing on reconstructed depth, including clipping against specified planes
@@ -103,7 +103,7 @@ class FDepthClippingPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FDepthClippingPS, "/Plugin/StereolabsCompositing/DepthProcessing.usf", "DepthClipPS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FDepthClippingPS, "/Plugin/CompositionUtils/DepthProcessing.usf", "DepthClipPS", SF_Pixel);
 
 
 class FVisualizeDepthPS : public FGlobalShader
@@ -124,10 +124,10 @@ class FVisualizeDepthPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FVisualizeDepthPS, "/Plugin/StereolabsCompositing/DepthProcessing.usf", "VisualizeDepthPS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FVisualizeDepthPS, "/Plugin/CompositionUtils/DepthProcessing.usf", "VisualizeDepthPS", SF_Pixel);
 
 
-void StereolabsCompositing::ExecuteDepthProcessingPipeline(
+void CompositionUtils::ExecuteDepthProcessingPipeline(
 	FRDGBuilder& GraphBuilder,
 	const FDepthProcessingParametersProxy& Parameters,
 	FRDGTextureRef InTexture,
@@ -136,14 +136,14 @@ void StereolabsCompositing::ExecuteDepthProcessingPipeline(
 {
 	check(IsInRenderingThread());
 
-	RDG_EVENT_SCOPE_STAT(GraphBuilder, SlCompDepthProcessingStat, "SlCompDepthProcessing");
-	RDG_GPU_STAT_SCOPE(GraphBuilder, SlCompDepthProcessingStat);
-	SCOPED_NAMED_EVENT(SlCompDepthProcessing, FColor::Purple);
+	RDG_EVENT_SCOPE_STAT(GraphBuilder, CompUtilsDepthProcessingStat, "CompUtilsDepthProcessing");
+	RDG_GPU_STAT_SCOPE(GraphBuilder, CompUtilsDepthProcessingStat);
+	SCOPED_NAMED_EVENT(CompUtilsDepthProcessing, FColor::Purple);
 
-	FRDGTextureRef TempTexture1 = CreateTextureFrom(GraphBuilder, OutTexture, TEXT("StereolabsCompositingDepthProcessing.Temp1"));
-	FRDGTextureRef TempTexture2 = CreateTextureFrom(GraphBuilder, OutTexture, TEXT("StereolabsCompositingDepthProcessing.Temp2"));
+	FRDGTextureRef TempTexture1 = CreateTextureFrom(GraphBuilder, OutTexture, TEXT("CompositionUtilsDepthProcessing.Temp1"));
+	FRDGTextureRef TempTexture2 = CreateTextureFrom(GraphBuilder, OutTexture, TEXT("CompositionUtilsDepthProcessing.Temp2"));
 
-	StereolabsCompositing::AddPass<FPreProcessDepthPS>(
+	CompositionUtils::AddPass<FPreProcessDepthPS>(
 		GraphBuilder,
 		RDG_EVENT_NAME("PreProcessDepth"),
 		TempTexture1,
@@ -157,7 +157,7 @@ void StereolabsCompositing::ExecuteDepthProcessingPipeline(
 	{
 		for (uint32 i = 0; i < Parameters.NumJacobiSteps; i++)
 		{
-			StereolabsCompositing::AddPass<FJacobiStepPS, TStaticSamplerState<>>(
+			CompositionUtils::AddPass<FJacobiStepPS, TStaticSamplerState<>>(
 				GraphBuilder,
 				RDG_EVENT_NAME("JacobiStep(i=%d)", 2 * i),
 				TempTexture2,
@@ -167,7 +167,7 @@ void StereolabsCompositing::ExecuteDepthProcessingPipeline(
 				}
 			);
 
-			StereolabsCompositing::AddPass<FJacobiStepPS, TStaticSamplerState<>>(
+			CompositionUtils::AddPass<FJacobiStepPS, TStaticSamplerState<>>(
 				GraphBuilder,
 				RDG_EVENT_NAME("JacobiStep(i=%d)", 2 * i + 1),
 				TempTexture1,
@@ -180,7 +180,7 @@ void StereolabsCompositing::ExecuteDepthProcessingPipeline(
 	}
 
 	// Post Processing
-	StereolabsCompositing::AddPass<FDepthClippingPS, TStaticSamplerState<>>(
+	CompositionUtils::AddPass<FDepthClippingPS, TStaticSamplerState<>>(
 		GraphBuilder,
 		RDG_EVENT_NAME("DepthClipping"),
 		OutTexture,
@@ -199,11 +199,11 @@ void StereolabsCompositing::ExecuteDepthProcessingPipeline(
 }
 
 
-void StereolabsCompositing::VisualizeProcessedDepth(FRDGBuilder& GraphBuilder, FVector2f VisualizeRange, FRDGTextureRef ProcessedDepthTexture, FRDGTextureRef OutTexture)
+void CompositionUtils::VisualizeProcessedDepth(FRDGBuilder& GraphBuilder, FVector2f VisualizeRange, FRDGTextureRef ProcessedDepthTexture, FRDGTextureRef OutTexture)
 {
 	check(IsInRenderingThread());
 
-	StereolabsCompositing::AddPass<FVisualizeDepthPS>(
+	CompositionUtils::AddPass<FVisualizeDepthPS>(
 		GraphBuilder,
 		RDG_EVENT_NAME("VisualizeDepth"),
 		OutTexture,

@@ -1,4 +1,4 @@
-#include "SlCompPipelines.h"
+#include "CompUtilsPipelines.h"
 
 
 class FVisualizeNormalMapPS : public FGlobalShader
@@ -22,10 +22,10 @@ class FVisualizeNormalMapPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FVisualizeNormalMapPS, "/Plugin/StereolabsCompositing/NormalMapProcessing.usf", "VisualizeNormalMapPS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FVisualizeNormalMapPS, "/Plugin/CompositionUtils/NormalMapProcessing.usf", "VisualizeNormalMapPS", SF_Pixel);
 
 
-void StereolabsCompositing::VisualizeNormalMap(
+void CompositionUtils::VisualizeNormalMap(
 	FRDGBuilder& GraphBuilder,
 	bool bWorldSpace,
 	const FTransform& LocalToWorldTransform,
@@ -38,7 +38,7 @@ void StereolabsCompositing::VisualizeNormalMap(
 	FVisualizeNormalMapPS::FPermutationDomain Permutation;
 	Permutation.Set<FVisualizeNormalMapPS::FTransformToWorldSpace>(bWorldSpace);
 
-	StereolabsCompositing::AddPass<FVisualizeNormalMapPS>(
+	CompositionUtils::AddPass<FVisualizeNormalMapPS>(
 		GraphBuilder,
 		RDG_EVENT_NAME("VisualizeDepth"),
 		OutTexture,
