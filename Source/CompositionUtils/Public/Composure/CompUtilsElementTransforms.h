@@ -39,7 +39,47 @@ public:
 	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;
 
 public:
+	//~ Begin UCompositingElementTransform interface
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
+	//~ End UCompositingElementTransform interface
+
+	//~ Begin UObject interface
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+	//~ End UObject interface
+
+private:
+	TWeakObjectPtr<UCompositionUtilsAuxiliaryCameraInput> AuxiliaryCameraInput;
+};
+
+
+/**
+ * Aligns the depth image (input to this pass) as if it had been taken from the POV of a different camera, specified by the Virtual Camera Target Actor
+ */
+UCLASS(BlueprintType, Blueprintable)
+class COMPOSITIONUTILS_API UCompositionUtilsDepthAlignmentPass : public UCompositingElementTransform
+{
+	GENERATED_BODY()
+
+public:
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	TWeakObjectPtr<ACameraActor> VirtualCameraTargetActor;
+
+public:
+	//~ Begin UCompositingElementTransform interface
+	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
+	//~ End UCompositingElementTransform interface
+
+	//~ Begin UObject interface
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+	//~ End UObject interface
 
 private:
 	TWeakObjectPtr<UCompositionUtilsAuxiliaryCameraInput> AuxiliaryCameraInput;

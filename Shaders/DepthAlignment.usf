@@ -1,0 +1,107 @@
+#include "/Engine/Private/Common.ush"
+#include "/Engine/Private/ScreenPass.ush"
+
+SCREEN_PASS_TEXTURE_VIEWPORT(OutViewPort)
+SCREEN_PASS_TEXTURE_VIEWPORT(InViewPort)
+
+
+Texture2D InTex;
+SamplerState sampler0; // Bilinear sampler to perform interpolation
+
+float2 CalculateUVMapPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	return InUV;
+}
+
+
+#ifndef THREADGROUP_SIZE_2D
+#define THREADGROUP_SIZE_2D 1
+#endif
+
+Texture2D<float4> InDepthTexture;
+RWTexture2D<float4> OutDepthTexture;
+
+Texture2D<float2> InUVMap;
+
+// Alignment requires atomics - so must use buffers of integer types
+Buffer<uint> InBuffer;
+RWBuffer<uint> OutBuffer;
+
+uint2 ViewDims;
+
+[numthreads(THREADGROUP_SIZE_2D, THREADGROUP_SIZE_2D, 1)]
+void ConvertDepthTextureToBufferCS(uint3 DispatchThreadId : SV_DispatchThreadID)
+{
+	uint2 PixelCoord = DispatchThreadId.xy;
+	if (any(PixelCoord >= ViewDims))
+	{
+		return;
+	}
+
+	float4 DepthValue = InDepthTexture[PixelCoord];
+
+	uint Index = PixelCoord.y * ViewDims.x + PixelCoord.x;
+
+	// Pixels with alpha of 0 are invalid/clipped
+	uint ValidFlag = DepthValue.a > 0.0f;
+
+	// Using trick of interpreting float as uint to be use atomic min/max on float types from https://www.jeremyong.com/graphics/2023/09/05/f32-interlocked-min-max-hlsl/
+	uint DepthAsUint = asuint(DepthValue.r);
+	if ((DepthAsUint >> 31) == 0)
+		DepthAsUint = DepthAsUint | (1u << 31);
+	else
+		DepthAsUint = ~DepthAsUint;
+
+	OutBuffer[Index] = ValidFlag ? DepthAsUint : 0;
+}
+
+[numthreads(THREADGROUP_SIZE_2D, THREADGROUP_SIZE_2D, 1)]
+void AlignDepthToColorCS(uint3 DispatchThreadId : SV_DispatchThreadID)
+{
+	uint2 PixelCoord = DispatchThreadId.xy;
+	if (any(PixelCoord >= ViewDims))
+	{
+		return;
+	}
+
+	uint Index = PixelCoord.y * ViewDims.x + PixelCoord.x;
+	uint InData = InBuffer[Index];
+
+	float2 MappedUV = InUVMap[PixelCoord];
+	uint2 MappedPixelCoord = MappedUV * ViewDims;
+	uint MappedIndex = MappedPixelCoord.y * ViewDims.x + MappedPixelCoord.x;
+
+	uint Dummy;
+	InterlockedMax(OutBuffer[MappedIndex], InData, Dummy);
+}
+
+[numthreads(THREADGROUP_SIZE_2D, THREADGROUP_SIZE_2D, 1)]
+void ConvertBufferToDepthTextureCS(uint3 DispatchThreadId : SV_DispatchThreadID)
+{
+	uint2 PixelCoord = DispatchThreadId.xy;
+	if (any(PixelCoord >= ViewDims))
+	{
+		return;
+	}
+
+	uint Index = PixelCoord.y * ViewDims.x + PixelCoord.x;
+	uint DepthAsUint = InBuffer[Index];
+
+	uint ValidFlag = DepthAsUint != 0;
+
+	// Using trick of interpreting float as uint to be use atomic min/max on float types from https://www.jeremyong.com/graphics/2023/09/05/f32-interlocked-min-max-hlsl/
+	float DepthValue;
+	if (DepthAsUint >> 31 == 0)
+	{
+		DepthValue = asfloat(~DepthAsUint);
+	}
+	else
+	{
+		DepthValue = asfloat(DepthAsUint & ~(1u << 31));
+	}
+
+	float4 Output = ValidFlag ? float4(DepthValue.xxx, 1.0f) : 0.0f;
+	OutDepthTexture[PixelCoord] = Output;
+}

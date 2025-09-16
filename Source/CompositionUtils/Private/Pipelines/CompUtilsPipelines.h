@@ -3,6 +3,8 @@
 #include "ScreenPass.h"
 #include <functional>
 
+#include "Composure/CompUtilsElementInput.h"
+
 
 struct FDepthProcessingParametersProxy
 {
@@ -21,6 +23,14 @@ struct FDepthProcessingParametersProxy
 	FVector4f UserClippingPlane;
 };
 
+struct FDepthAlignmentParametersProxy
+{
+	// Virtual camera data
+	FMatrix44f VirtualCam_ProjectionMatrix;
+	FMatrix44f VirtualCam_InvProjectionMatrix;
+
+	FAuxiliaryCameraDataProxy AuxiliaryCameraData;
+};
 
 // Resources and parameters extracted from the scene render graph to be able to apply volumetric fog in composure
 struct FVolumetricFogRequiredDataProxy
@@ -99,6 +109,14 @@ namespace CompositionUtils
 		FRDGBuilder& GraphBuilder,
 		FVector2f VisualizeRange, // [VisualizeRange.x, VisualizeRange.y] is mapped to [0,1]
 		FRDGTextureRef ProcessedDepthTexture,
+		FRDGTextureRef OutTexture
+	);
+
+
+	void ExecuteDepthAlignmentPipeline(
+		FRDGBuilder& GraphBuilder,
+		const FDepthAlignmentParametersProxy& Parameters,
+		FRDGTextureRef InTexture,
 		FRDGTextureRef OutTexture
 	);
 

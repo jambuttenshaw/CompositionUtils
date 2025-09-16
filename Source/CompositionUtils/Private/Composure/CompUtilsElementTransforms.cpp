@@ -1,5 +1,6 @@
 #include "Composure/CompUtilsElementTransforms.h"
 
+#include "CompositionUtils.h"
 #include "RenderGraphBuilder.h"
 #include "CompositingElements/ICompositingTextureLookupTable.h"
 
@@ -90,11 +91,112 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 	return RenderTarget;
 }
 
+#if WITH_EDITOR
+void UCompositionUtilsDepthProcessingPass::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
+{
+	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCompositionUtilsDepthProcessingPass, AuxiliaryCameraInputElement))
+	{
+		AuxiliaryCameraInput = nullptr;
+	}
+
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+}
+#endif
 
 
-///////////////////////////////////////////
+/////////////////////////////////////////
+// UCompositionUtilsDepthAlignmentPass //
+/////////////////////////////////////////
+
+
+UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
+{
+	if (!Input)
+		return Input;
+	check(Input->GetResource());
+
+	FIntPoint Dims;
+	Dims.X = Input->GetResource()->GetSizeX();
+	Dims.Y = Input->GetResource()->GetSizeY();
+
+	UTextureRenderTarget2D* RenderTarget = RequestRenderTarget(Dims, PF_FloatRGBA);
+	if (!(RenderTarget && RenderTarget->GetResource()))
+		return Input;
+
+	// Collect parameters
+	// If any fails then this will pass through with a warning
+	FDepthAlignmentParametersProxy ParametersProxy;
+
+	if (VirtualCameraTargetActor.IsValid())
+	{
+		FMinimalViewInfo VirtualCameraView;
+		VirtualCameraTargetActor->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
+
+		FMatrix ProjectionMatrix = VirtualCameraView.CalculateProjectionMatrix();
+		ParametersProxy.VirtualCam_ProjectionMatrix = static_cast<FMatrix44f>(ProjectionMatrix);
+		ParametersProxy.VirtualCam_InvProjectionMatrix = static_cast<FMatrix44f>(ProjectionMatrix.Inverse());
+	}
+	else
+	{
+		UE_LOG(LogCompositionUtils, Warning, TEXT("CompositionUtilsDepthAlignmentPass is not set up correctly: Virtual Camera Target Actor is missing!"));
+		return Input;
+	}
+
+	if (!AuxiliaryCameraInput.IsValid())
+		AuxiliaryCameraInput = UCompositionUtilsAuxiliaryCameraInput::TryGetAuxCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
+	if (AuxiliaryCameraInput.IsValid() && AuxiliaryCameraInput->GetCameraData(ParametersProxy.AuxiliaryCameraData))
+	{}
+	else
+	{
+		UE_LOG(LogCompositionUtils, Warning, TEXT("CompositionUtilsDepthAlignmentPass is not set up correctly: Auxiliary Camera Input Element is missing!"));
+		return Input;
+	}
+
+
+	ENQUEUE_RENDER_COMMAND(ApplyDepthAlignmentPass)(
+		[Parameters = ParametersProxy, InputResource = Input->GetResource(), OutputResource = RenderTarget->GetResource()]
+		(FRHICommandListImmediate& RHICmdList)
+		{
+			FRDGBuilder GraphBuilder(RHICmdList);
+
+			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("CompUtilsVolumetricsPass.Input"));
+			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("CompUtilsVolumetricsPass.Output"));
+
+			// Set up RDG resources
+			FRDGTextureRef InColorTexture = GraphBuilder.RegisterExternalTexture(InputRT);
+			FRDGTextureRef OutColorTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
+
+			// Execute pipeline
+			CompositionUtils::ExecuteDepthAlignmentPipeline(
+				GraphBuilder,
+				Parameters,
+				InColorTexture,
+				OutColorTexture);
+
+			GraphBuilder.Execute();
+		});
+
+	return RenderTarget;
+}
+
+#if WITH_EDITOR
+void UCompositionUtilsDepthAlignmentPass::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
+{
+	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCompositionUtilsDepthAlignmentPass, AuxiliaryCameraInputElement))
+	{
+		AuxiliaryCameraInput = nullptr;
+	}
+
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+}
+#endif
+
+
+//////////////////////////////////////
 // UCompositionUtilsVolumetricsPass //
-///////////////////////////////////////////
+//////////////////////////////////////
 
 
 UTexture* UCompositionUtilsVolumetricsPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
@@ -149,9 +251,9 @@ UTexture* UCompositionUtilsVolumetricsPass::ApplyTransform_Implementation(UTextu
 }
 
 
-//////////////////////////////////////////
+/////////////////////////////////////
 // UCompositionUtilsRelightingPass //
-//////////////////////////////////////////
+/////////////////////////////////////
 
 
 UTexture* UCompositionUtilsRelightingPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)

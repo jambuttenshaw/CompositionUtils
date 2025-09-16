@@ -136,7 +136,9 @@ void FCompUtilsViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FScene
 			VirtualCameraView,
 			TextureExtent,
 			CameraTextures.AuxiliaryCameraData,
-			CaptureActor->bDisableReprojectionUVMap
+			// Reprojection UV map should just pass through when depth has already been aligned by another pass
+			// TODO: Deprecate the reprojection UV map and require external depth alignment
+			CaptureActor->bDisableReprojectionUVMap || CaptureActor->bDepthAlreadyAligned
 		);
 	}
 

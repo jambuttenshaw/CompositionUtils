@@ -50,6 +50,10 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode"))
 	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;
 
+	// If depth is already aligned then the reprojection UV map is not required
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode"))
+	bool bDepthAlreadyAligned = false;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode"))
 	bool bDisableReprojectionUVMap = false;
 
