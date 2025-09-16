@@ -83,7 +83,7 @@ struct FRelightingParametersProxy
 };
 
 
-struct FCameraTexturesProxy;
+struct FAuxiliaryCameraDataProxy;
 
 namespace CompositionUtils
 {
@@ -107,7 +107,7 @@ namespace CompositionUtils
 		FRDGBuilder& GraphBuilder,
 		const FMinimalViewInfo& VirtualCameraView,
 		FIntPoint TextureExtent,
-		const FCameraTexturesProxy& CameraTextures,
+		const FAuxiliaryCameraDataProxy& AuxiliaryCameraData,
 		bool bPassThough = false // Optionally pass through - debug tool to enable / disable reprojection
 	);
 

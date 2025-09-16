@@ -31,23 +31,14 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 
 	if (!AuxiliaryCameraInput.IsValid())
 	{
-		if (AuxiliaryCameraInputElement.IsValid())
-		{
-			UTexture* Unused;
-			if (UCompositingElementInput* InputPass = AuxiliaryCameraInputElement->FindInputPass(UCompositionUtilsAuxiliaryCameraInput::StaticClass(), Unused))
-			{
-				if (UCompositionUtilsAuxiliaryCameraInput* AuxiliaryCameraInputPass = Cast<UCompositionUtilsAuxiliaryCameraInput>(InputPass))
-				{
-					AuxiliaryCameraInput = AuxiliaryCameraInputPass;
-				}
-			}
-		}
+		AuxiliaryCameraInput = UCompositionUtilsAuxiliaryCameraInput::TryGetAuxCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
 	}
 
-	if (AuxiliaryCameraInput.IsValid())
+	FAuxiliaryCameraDataProxy AuxCameraData;
+	if (AuxiliaryCameraInput.IsValid() && AuxiliaryCameraInput->GetCameraData(AuxCameraData))
 	{
-		Params.InvProjectionMatrix = AuxiliaryCameraInput->GetInverseProjectionMatrix();
-		Params.CameraNearClippingPlane = AuxiliaryCameraInput->GetNearClippingPlane();
+		Params.InvProjectionMatrix = AuxCameraData.NDCToViewMatrix;
+		Params.CameraNearClippingPlane = AuxCameraData.NearClipPlane;
 	}
 	else
 	{

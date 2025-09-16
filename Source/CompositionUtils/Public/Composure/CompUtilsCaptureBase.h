@@ -14,11 +14,9 @@ struct FCameraTexturesProxy
 	UTexture* DepthTexture   = nullptr;
 	UTexture* NormalsTexture = nullptr;
 
-	// Optional - contains extrinsic properties of auxiliary camera (that is providing depth)
+	// Optional - contains properties of auxiliary camera (that is providing depth)
 	// Note that ColorTexture and DepthTexture may come from different physical cameras
-	FMatrix44f ViewToNDCMatrix; // Projection Matrix
-	FMatrix44f NDCToViewMatrix; // Inv Projection Matrix
-	float NearClipPlane;
+	FAuxiliaryCameraDataProxy AuxiliaryCameraData;
 };
 
 
@@ -47,7 +45,7 @@ public:
 	FName CameraNormalsPassName;
 
 	// This should be the input pass name of the pass that feeds the depth image. It should be of type UCompositionUtilsAuxiliaryCameraInput.
-	// This is required to get extrinsic properties of the camera to align the depth image with the colour image.
+	// This is required to get properties of the camera to align the depth image with the colour image.
 	// Not necessary when colour and depth are coming from the same camera source.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode"))
 	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;

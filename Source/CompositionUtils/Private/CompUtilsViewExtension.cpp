@@ -135,7 +135,7 @@ void FCompUtilsViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FScene
 			GraphBuilder,
 			VirtualCameraView,
 			TextureExtent,
-			CameraTextures,
+			CameraTextures.AuxiliaryCameraData,
 			CaptureActor->bDisableReprojectionUVMap
 		);
 	}
@@ -168,8 +168,8 @@ void FCompUtilsViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FScene
 
 		// Get physical depth camera properties
 		{
-			PassParameters->DepthCameraViewToNDC = CameraTextures.ViewToNDCMatrix;
-			PassParameters->DepthCameraNDCToView = CameraTextures.NDCToViewMatrix;
+			PassParameters->DepthCameraViewToNDC = CameraTextures.AuxiliaryCameraData.ViewToNDCMatrix;
+			PassParameters->DepthCameraNDCToView = CameraTextures.AuxiliaryCameraData.NDCToViewMatrix;
 		}
 
 		PassParameters->AmbientMultiplier = CaptureActor->AmbientMultiplier;

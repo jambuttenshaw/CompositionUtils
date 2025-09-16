@@ -40,30 +40,12 @@ void ACompositionUtilsCaptureBase::FetchLatestCameraTextures_GameThread()
 
 	if (!AuxiliaryCameraInput.IsValid())
 	{
-		if (AuxiliaryCameraInputElement.IsValid())
-		{
-			UTexture* Unused;
-			if (UCompositingElementInput* InputPass = AuxiliaryCameraInputElement->FindInputPass(UCompositionUtilsAuxiliaryCameraInput::StaticClass(), Unused))
-			{
-				if (UCompositionUtilsAuxiliaryCameraInput* AuxiliaryCameraInputPass = Cast<UCompositionUtilsAuxiliaryCameraInput>(InputPass))
-				{
-					AuxiliaryCameraInput = AuxiliaryCameraInputPass;
-				}
-			}
-		}
+		AuxiliaryCameraInput = UCompositionUtilsAuxiliaryCameraInput::TryGetAuxCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
 	}
 
 	if (AuxiliaryCameraInput.IsValid())
 	{
-		Textures.ViewToNDCMatrix = AuxiliaryCameraInput->GetProjectionMatrix();
-		Textures.NDCToViewMatrix = AuxiliaryCameraInput->GetInverseProjectionMatrix();
-		Textures.NearClipPlane = AuxiliaryCameraInput->GetNearClippingPlane();
-	}
-	else
-	{
-		Textures.ViewToNDCMatrix = FMatrix44f::Identity;
-		Textures.NDCToViewMatrix = FMatrix44f::Identity;
-		Textures.NearClipPlane = 10.0f;
+		(void)AuxiliaryCameraInput->GetCameraData(Textures.AuxiliaryCameraData);
 	}
 
 	ENQUEUE_RENDER_COMMAND(UpdateCameraTextures)(

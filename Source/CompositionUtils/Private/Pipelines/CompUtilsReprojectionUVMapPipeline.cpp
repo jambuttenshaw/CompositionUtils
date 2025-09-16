@@ -60,7 +60,7 @@ FRDGTextureRef CompositionUtils::CreateReprojectionUVMap(
 	FRDGBuilder& GraphBuilder, 
 	const FMinimalViewInfo& VirtualCameraView, 
 	FIntPoint TextureExtent,
-	const FCameraTexturesProxy& CameraTextures,
+	const FAuxiliaryCameraDataProxy& AuxiliaryCameraData,
 	bool bPassThrough
 )
 {
@@ -91,9 +91,9 @@ FRDGTextureRef CompositionUtils::CreateReprojectionUVMap(
 		}
 
 		{
-			PassParameters->DepthCameraViewToNDC = CameraTextures.ViewToNDCMatrix;
-			PassParameters->DepthCameraNDCToView = CameraTextures.NDCToViewMatrix;
-			PassParameters->DepthCameraNearClippingPlane = CameraTextures.NearClipPlane;
+			PassParameters->DepthCameraViewToNDC = AuxiliaryCameraData.ViewToNDCMatrix;
+			PassParameters->DepthCameraNDCToView = AuxiliaryCameraData.NDCToViewMatrix;
+			PassParameters->DepthCameraNearClippingPlane = AuxiliaryCameraData.NearClipPlane;
 
 			PassParameters->InvDepthCameraNodalOffset = FMatrix44f::Identity;
 		}
