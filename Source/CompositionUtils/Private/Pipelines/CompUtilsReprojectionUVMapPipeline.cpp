@@ -1,6 +1,15 @@
+#include "CompositionUtils.h"
 #include "CompUtilsPipelines.h"
 
 #include "Composure/CompUtilsCaptureBase.h"
+
+
+static TAutoConsoleVariable<bool> CVarCompUtilsSuppressAspectRatioWarnings(
+	TEXT("CompUtils.SuppressAspectRatioWarnings"),
+	false,
+	TEXT("Disables warnings when CG capture aspect ratio is perfectly square - it usually means that the actor is not set up correctly. (Default = false)"),
+	ECVF_RenderThreadSafe
+);
 
 
 class FReprojectionUVMapPS : public FGlobalShader
@@ -70,6 +79,13 @@ FRDGTextureRef CompositionUtils::CreateReprojectionUVMap(
 
 		{
 			FMatrix CameraProjectionMatrix = VirtualCameraView.CalculateProjectionMatrix();
+			if ((CameraProjectionMatrix.M[0][0] == CameraProjectionMatrix.M[1][1]) && !CVarCompUtilsSuppressAspectRatioWarnings.GetValueOnRenderThread())
+			{
+				UE_LOG(LogCompositionUtils, Warning, 
+					TEXT("Virtual camera aspect ratio is 1:1. Did you override the target camera actor in the CG element? Enable CompUtils.SuppressAspectRatioWarnings to suppress.")
+				);
+			}
+
 			PassParameters->VirtualCameraViewToNDC = static_cast<FMatrix44f>(CameraProjectionMatrix);
 			PassParameters->VirtualCameraNDCToView = static_cast<FMatrix44f>(CameraProjectionMatrix.Inverse());
 		}
