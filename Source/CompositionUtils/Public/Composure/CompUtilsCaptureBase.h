@@ -35,11 +35,14 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection")
 	bool bInjectionMode = false;
 
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode", DisplayAfter = "bInjectionMode"))
+	bool bUseOverrideColorPass = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode", DisplayAfter = "bUseOverrideColorPass"))
+	bool bAlignColorAndNormals = false;
+
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode&&!bUseOverrideColorPass"))
 	FName CameraColorPassName;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode"))
-	bool bUseOverrideColorPass = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode&&bUseOverrideColorPass"))
 	FName OverrideCameraColorPassName;
@@ -55,9 +58,6 @@ public:
 	// Not necessary when colour and depth are coming from the same camera source.
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode"))
 	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode"))
-	bool bAlignColorAndNormals = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode"))
 	bool bExtractVolumetricFogInInjectionMode = false;
