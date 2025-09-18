@@ -194,8 +194,8 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 	FRDGBufferDesc BufferDesc = FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), BufferWidth);
 	FRDGBufferRef BufferA = GraphBuilder.CreateBuffer(BufferDesc, TEXT("CompUtils.DepthAlignment.BufferA"));
 	FRDGBufferRef BufferB = GraphBuilder.CreateBuffer(BufferDesc, TEXT("CompUtils.DepthAlignment.BufferB"));
-	AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(BufferA, PF_R32_UINT), 0);
-	AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(BufferB, PF_R32_UINT), 0);
+	AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(BufferA, PF_R32_UINT), 0xFF800000);
+	AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(BufferB, PF_R32_UINT), 0xFF800000);
 
 	// Create UV map
 	CompositionUtils::AddPass<FCalculateUVMapPS>(
@@ -209,7 +209,7 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 			PassParameters->PhysicalNDCToView = Parameters.AuxiliaryCameraData.NDCToViewMatrix;
 			PassParameters->InvDeviceZToWorldZTransform = CreateInvDeviceZToWorldZTransform(static_cast<FMatrix>(Parameters.AuxiliaryCameraData.ViewToNDCMatrix));
 
-			PassParameters->PhysicalToVirtualOffset = FMatrix44f::Identity;
+			PassParameters->PhysicalToVirtualOffset = Parameters.AuxiliaryToPrimaryNodalOffset;
 			PassParameters->VirtualViewToNDC = Parameters.VirtualCam_ViewToNDC;
 		}
 	);
@@ -253,8 +253,8 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 			};
 
 			PassParameters->PatchSize = FUintVector2{
-				static_cast<uint32>(FMath::Clamp(PatchSize.X, 1, 16)),
-				static_cast<uint32>(FMath::Clamp(PatchSize.Y, 1, 16))
+				static_cast<uint32>(FMath::Clamp(PatchSize.X + Parameters.HoleFillingBias, 1, 16)),
+				static_cast<uint32>(FMath::Clamp(PatchSize.Y + Parameters.HoleFillingBias, 1, 16))
 			};
 		}
 

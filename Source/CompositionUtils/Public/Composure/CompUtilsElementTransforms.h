@@ -70,6 +70,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
 	TWeakObjectPtr<ACameraActor> VirtualCameraTargetActor;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	FTransform AuxiliaryToPrimaryNodalOffset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled", ClampMin="0", ClampMax="8"))
+	int32 HoleFillingBias = 0;
+
 public:
 	//~ Begin UCompositingElementTransform interface
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;

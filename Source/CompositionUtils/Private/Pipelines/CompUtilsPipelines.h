@@ -31,7 +31,12 @@ struct FDepthAlignmentParametersProxy
 	float VirtualCam_HorizontalFOV; // IN RADIANS!!!
 	float VirtualCam_AspectRatio;
 
+	// Extrinsic properties
+	FMatrix44f AuxiliaryToPrimaryNodalOffset;
+
 	FAuxiliaryCameraData AuxiliaryCameraData;
+
+	uint32 HoleFillingBias = 0;
 };
 
 // Resources and parameters extracted from the scene render graph to be able to apply volumetric fog in composure

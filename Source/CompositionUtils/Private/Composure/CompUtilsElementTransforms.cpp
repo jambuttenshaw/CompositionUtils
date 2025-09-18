@@ -145,6 +145,8 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		return Input;
 	}
 
+	ParametersProxy.AuxiliaryToPrimaryNodalOffset = static_cast<FMatrix44f>(AuxiliaryToPrimaryNodalOffset.ToMatrixNoScale());
+
 	if (!AuxiliaryCameraInput.IsValid())
 		AuxiliaryCameraInput = UCompositionUtilsAuxiliaryCameraInput::TryGetAuxCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
 	if (AuxiliaryCameraInput.IsValid() && AuxiliaryCameraInput->GetCameraData(ParametersProxy.AuxiliaryCameraData))
@@ -155,6 +157,7 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		return Input;
 	}
 
+	ParametersProxy.HoleFillingBias = static_cast<uint32>(HoleFillingBias);
 
 	ENQUEUE_RENDER_COMMAND(ApplyDepthAlignmentPass)(
 		[Parameters = ParametersProxy, InputResource = Input->GetResource(), OutputResource = RenderTarget->GetResource()]

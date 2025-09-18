@@ -75,16 +75,16 @@ void ConvertDepthTextureToBufferCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	uint Index = PixelCoord.y * ViewDims.x + PixelCoord.x;
 
 	// Pixels with alpha of 0 are invalid/clipped
-	uint ValidFlag = DepthValue.a > 0.0f;
+	bool bValidFlag = DepthValue.a > 0.0f;
 
 	// Using trick of interpreting float as uint to be use atomic min/max on float types from https://www.jeremyong.com/graphics/2023/09/05/f32-interlocked-min-max-hlsl/
-	uint DepthAsUint = asuint(DepthValue.r);
+	uint DepthAsUint = bValidFlag ? asuint(DepthValue.r) : 0xFF800000;
 	if ((DepthAsUint >> 31) == 0)
 		DepthAsUint = DepthAsUint | (1u << 31);
 	else
 		DepthAsUint = ~DepthAsUint;
 
-	OutBuffer[Index] = ValidFlag ? DepthAsUint : 0;
+	OutBuffer[Index] = DepthAsUint;
 }
 
 // Due to differences in FOV, some pixels could remain blank resulting in holes in the output
@@ -104,14 +104,10 @@ void AlignDepthToColorCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	uint InData = InBuffer[Index];
 
 	float2 MappedUV = InUVMap[PixelCoord];
-	if (any(MappedUV < 0.0f))
+	if (any(MappedUV < 0.0f) || isinf(InData))
 	{
-		InData = 0;
-	}
-
-	// No valid data - this will never win InterlockedMax
-	if (InData == 0)
 		return;
+	}
 
 	uint2 MappedPixelCoord = MappedUV * ViewDims;
 
@@ -123,7 +119,7 @@ void AlignDepthToColorCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 			uint MappedIndex = OutPixelCoord.y * ViewDims.x + OutPixelCoord.x;
 
 			uint Dummy;
-			InterlockedMax(OutBuffer[MappedIndex], InData, Dummy);
+			InterlockedMin(OutBuffer[MappedIndex], InData, Dummy);
 		}
 	}
 }
@@ -140,8 +136,6 @@ void ConvertBufferToDepthTextureCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	uint Index = PixelCoord.y * ViewDims.x + PixelCoord.x;
 	uint DepthAsUint = InBuffer[Index];
 
-	uint ValidFlag = DepthAsUint != 0;
-
 	// Using trick of interpreting float as uint to be use atomic min/max on float types from https://www.jeremyong.com/graphics/2023/09/05/f32-interlocked-min-max-hlsl/
 	float DepthValue;
 	if (DepthAsUint >> 31 == 0)
@@ -153,6 +147,6 @@ void ConvertBufferToDepthTextureCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 		DepthValue = asfloat(DepthAsUint & ~(1u << 31));
 	}
 
-	float4 Output = ValidFlag ? float4(DepthValue.xxx, 1.0f) : 0.0f;
+	float4 Output = float4(DepthValue.x, 0, 0, !isinf(DepthValue));
 	OutDepthTexture[PixelCoord] = Output;
 }

@@ -131,7 +131,7 @@ float4 DepthClipPS(
 	D.w *= saturate(bEnableFarClipping) * D.x < FarClipDistance;
 
 	// NOTE: Clipped pixels (with D.w == 0) still keep their original depth value - this prevents artefacts in case of sampling the depth texture with bilinear filtering
-	return D;
+	return float4(D.x, 0, 0, D.w);
 }
 
 
@@ -152,5 +152,5 @@ float4 VisualizeDepthPS(
 	}
 
 	float MappedDepth = saturate((DepthValue - DepthRange.x) / (DepthRange.y - DepthRange.x));
-	return float4(MappedDepth.xxx, 1);
+	return float4(MappedDepth.x, Depth.gb, 1);
 }
