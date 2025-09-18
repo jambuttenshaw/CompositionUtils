@@ -16,7 +16,7 @@ struct FCameraTexturesProxy
 
 	// Optional - contains properties of auxiliary camera (that is providing depth)
 	// Note that ColorTexture and DepthTexture may come from different physical cameras
-	FAuxiliaryCameraDataProxy AuxiliaryCameraData;
+	FAuxiliaryCameraData AuxiliaryCameraData;
 };
 
 

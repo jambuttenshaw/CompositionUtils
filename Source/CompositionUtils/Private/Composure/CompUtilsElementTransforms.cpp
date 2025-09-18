@@ -35,7 +35,7 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 		AuxiliaryCameraInput = UCompositionUtilsAuxiliaryCameraInput::TryGetAuxCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
 	}
 
-	FAuxiliaryCameraDataProxy AuxCameraData;
+	FAuxiliaryCameraData AuxCameraData;
 	if (AuxiliaryCameraInput.IsValid() && AuxiliaryCameraInput->GetCameraData(AuxCameraData))
 	{
 		Params.InvProjectionMatrix = AuxCameraData.NDCToViewMatrix;
@@ -134,8 +134,10 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		VirtualCameraTargetActor->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
 
 		FMatrix ProjectionMatrix = VirtualCameraView.CalculateProjectionMatrix();
-		ParametersProxy.VirtualCam_ProjectionMatrix = static_cast<FMatrix44f>(ProjectionMatrix);
-		ParametersProxy.VirtualCam_InvProjectionMatrix = static_cast<FMatrix44f>(ProjectionMatrix.Inverse());
+		ParametersProxy.VirtualCam_ViewToNDC = static_cast<FMatrix44f>(ProjectionMatrix);
+		ParametersProxy.VirtualCam_NDCToView = static_cast<FMatrix44f>(ProjectionMatrix.Inverse());
+		ParametersProxy.VirtualCam_HorizontalFOV = FMath::DegreesToRadians(VirtualCameraView.FOV);
+		ParametersProxy.VirtualCam_AspectRatio = VirtualCameraView.AspectRatio;
 	}
 	else
 	{

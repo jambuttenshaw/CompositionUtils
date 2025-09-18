@@ -4,6 +4,11 @@
 SCREEN_PASS_TEXTURE_VIEWPORT(OutViewPort)
 SCREEN_PASS_TEXTURE_VIEWPORT(InViewPort)
 
+float4x4 PhysicalNDCToView;
+float4 InvDeviceZToWorldZTransform;
+
+float4x4 PhysicalToVirtualOffset;
+float4x4 VirtualViewToNDC;
 
 Texture2D InTex;
 SamplerState sampler0; // Bilinear sampler to perform interpolation
@@ -12,7 +17,32 @@ float2 CalculateUVMapPS(
 	float2 InUV : TEXCOORD0
 ) : SV_Target0
 {
-	return InUV;
+	float Depth = InTex.Sample(sampler0, InUV).r;
+	float DeviceZ = 1.0f / ((Depth + InvDeviceZToWorldZTransform[3]) * InvDeviceZToWorldZTransform[2]);
+
+	// De-project pixel into view space
+	float4 NDC = float4(InUV * 2.0f - 1.0f, DeviceZ, 1.0f);
+	NDC.y = -NDC.y; // UV space has y-axis flipped from NDC
+
+	float4 Deprojected = mul(NDC, PhysicalNDCToView);
+	float4 ViewSpace = Deprojected / Deprojected.w;
+
+	// Apply nodal offest matrix
+	ViewSpace = mul(ViewSpace, PhysicalToVirtualOffset);
+
+	// Re-project back into screen space
+	NDC = mul(ViewSpace, VirtualViewToNDC);
+	NDC /= NDC.w;
+
+	float2 OutUV = NDC.xy * 0.5f + 0.5f;
+	OutUV.y = 1.0f - OutUV.y;
+
+	if (any(OutUV < 0.0f) || any(OutUV > 1.0f))
+	{
+		OutUV = -1;
+	}
+
+	return OutUV;
 }
 
 
@@ -57,6 +87,10 @@ void ConvertDepthTextureToBufferCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	OutBuffer[Index] = ValidFlag ? DepthAsUint : 0;
 }
 
+// Due to differences in FOV, some pixels could remain blank resulting in holes in the output
+// To help alleviate this, each depth pixel can be extended to larger patches to avoid holes at the cost of resolution
+uint2 PatchSize;
+
 [numthreads(THREADGROUP_SIZE_2D, THREADGROUP_SIZE_2D, 1)]
 void AlignDepthToColorCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 {
@@ -70,11 +104,28 @@ void AlignDepthToColorCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	uint InData = InBuffer[Index];
 
 	float2 MappedUV = InUVMap[PixelCoord];
-	uint2 MappedPixelCoord = MappedUV * ViewDims;
-	uint MappedIndex = MappedPixelCoord.y * ViewDims.x + MappedPixelCoord.x;
+	if (any(MappedUV < 0.0f))
+	{
+		InData = 0;
+	}
 
-	uint Dummy;
-	InterlockedMax(OutBuffer[MappedIndex], InData, Dummy);
+	// No valid data - this will never win InterlockedMax
+	if (InData == 0)
+		return;
+
+	uint2 MappedPixelCoord = MappedUV * ViewDims;
+
+	for (uint y = 0; y < PatchSize.y; y++)
+	{
+		for (uint x = 0; x < PatchSize.x; x++)
+		{
+			uint2 OutPixelCoord = min(MappedPixelCoord + uint2(x, y), ViewDims - 1);
+			uint MappedIndex = OutPixelCoord.y * ViewDims.x + OutPixelCoord.x;
+
+			uint Dummy;
+			InterlockedMax(OutBuffer[MappedIndex], InData, Dummy);
+		}
+	}
 }
 
 [numthreads(THREADGROUP_SIZE_2D, THREADGROUP_SIZE_2D, 1)]

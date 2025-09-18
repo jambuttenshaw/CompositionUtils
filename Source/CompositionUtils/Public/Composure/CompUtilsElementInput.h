@@ -8,7 +8,7 @@
 
 
 USTRUCT(BlueprintType)
-struct FAuxiliaryCameraDataProxy
+struct FAuxiliaryCameraData
 {
 	GENERATED_BODY()
 
@@ -17,6 +17,8 @@ struct FAuxiliaryCameraDataProxy
 
 	float NearClipPlane = 1.0f;							// In practice should be the minimum depth of the physical camera,
 														// but so long as it is consistent throughout compositing pipeline it should work regardless
+	float HorizontalFOV = 90.0f;
+	float VerticalFOV = 90.0f;
 };
 
 
@@ -27,7 +29,7 @@ class COMPOSITIONUTILS_API UCompositionUtilsAuxiliaryCameraInput : public UCompo
 public:
 
 	// Begin Auxiliary Camera Interface
-	virtual bool GetCameraData(FAuxiliaryCameraDataProxy& OutData) { return false; }
+	virtual bool GetCameraData(FAuxiliaryCameraData& OutData) { return false; }
 	// End Auxiliary Camera Interface
 
 

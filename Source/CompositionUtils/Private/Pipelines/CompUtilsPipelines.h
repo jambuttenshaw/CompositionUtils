@@ -26,10 +26,12 @@ struct FDepthProcessingParametersProxy
 struct FDepthAlignmentParametersProxy
 {
 	// Virtual camera data
-	FMatrix44f VirtualCam_ProjectionMatrix;
-	FMatrix44f VirtualCam_InvProjectionMatrix;
+	FMatrix44f VirtualCam_ViewToNDC;
+	FMatrix44f VirtualCam_NDCToView;
+	float VirtualCam_HorizontalFOV; // IN RADIANS!!!
+	float VirtualCam_AspectRatio;
 
-	FAuxiliaryCameraDataProxy AuxiliaryCameraData;
+	FAuxiliaryCameraData AuxiliaryCameraData;
 };
 
 // Resources and parameters extracted from the scene render graph to be able to apply volumetric fog in composure
@@ -93,7 +95,7 @@ struct FRelightingParametersProxy
 };
 
 
-struct FAuxiliaryCameraDataProxy;
+struct FAuxiliaryCameraData;
 
 namespace CompositionUtils
 {
@@ -125,7 +127,7 @@ namespace CompositionUtils
 		FRDGBuilder& GraphBuilder,
 		const FMinimalViewInfo& VirtualCameraView,
 		FIntPoint TextureExtent,
-		const FAuxiliaryCameraDataProxy& AuxiliaryCameraData,
+		const FAuxiliaryCameraData& AuxiliaryCameraData,
 		bool bPassThough = false // Optionally pass through - debug tool to enable / disable reprojection
 	);
 

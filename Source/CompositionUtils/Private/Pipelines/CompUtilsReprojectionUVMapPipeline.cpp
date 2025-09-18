@@ -60,7 +60,7 @@ FRDGTextureRef CompositionUtils::CreateReprojectionUVMap(
 	FRDGBuilder& GraphBuilder, 
 	const FMinimalViewInfo& VirtualCameraView, 
 	FIntPoint TextureExtent,
-	const FAuxiliaryCameraDataProxy& AuxiliaryCameraData,
+	const FAuxiliaryCameraData& AuxiliaryCameraData,
 	bool bPassThrough
 )
 {
