@@ -14,8 +14,8 @@ class FCameraFeedInjectionPS : public FGlobalShader
 	DECLARE_GLOBAL_SHADER(FCameraFeedInjectionPS);
 	SHADER_USE_PARAMETER_STRUCT(FCameraFeedInjectionPS, FGlobalShader)
 
-	class FColorSourceDepthCamera : SHADER_PERMUTATION_BOOL("COlOR_SOURCE_DEPTH_CAMERA");
-	using FPermutationDomain = TShaderPermutationDomain<FColorSourceDepthCamera>;
+	class FAlignColor : SHADER_PERMUTATION_BOOL("ALIGN_COLOR");
+	using FPermutationDomain = TShaderPermutationDomain<FAlignColor>;
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters,)
 		SHADER_PARAMETER_STRUCT_REF(FViewUniformShaderParameters, View)
@@ -26,8 +26,6 @@ class FCameraFeedInjectionPS : public FGlobalShader
 		SHADER_PARAMETER_TEXTURE(Texture2D<float4>, CameraColorTexture) // Not RDG resources
 		SHADER_PARAMETER_TEXTURE(Texture2D<float4>, CameraDepthTexture) 
 		SHADER_PARAMETER_TEXTURE(Texture2D<float4>, CameraNormalsTexture)
-
-		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float2>, ReprojectionUVMap)
 
 		SHADER_PARAMETER(FMatrix44f, VirtualCameraLocalToWorld)
 		SHADER_PARAMETER(FMatrix44f, VirtualCameraViewToNDC)
@@ -115,33 +113,6 @@ void FCompUtilsViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FScene
 		return;
 	}
 
-	FRDGTextureRef ReprojectionUVMap;
-	{
-		FMinimalViewInfo VirtualCameraView;
-		if (CaptureActor->TargetCameraActorPtr.IsValid())
-		{
-			CaptureActor->TargetCameraActorPtr->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
-		}
-		else
-		{
-			CaptureActor->SceneCaptureComponent2D->GetCameraView(0.0f, VirtualCameraView);
-		}
-		FIntPoint TextureExtent = {
-			static_cast<int32>(CameraTextures.DepthTexture->GetResource()->GetSizeX()),
-			static_cast<int32>(CameraTextures.DepthTexture->GetResource()->GetSizeY())
-		};
-
-		ReprojectionUVMap = CompositionUtils::CreateReprojectionUVMap(
-			GraphBuilder,
-			VirtualCameraView,
-			TextureExtent,
-			CameraTextures.AuxiliaryCameraData,
-			// Reprojection UV map should just pass through when depth has already been aligned by another pass
-			// TODO: Deprecate the reprojection UV map and require external depth alignment
-			CaptureActor->bDisableReprojectionUVMap || CaptureActor->bDepthAlreadyAligned
-		);
-	}
-
 	{
 		FCameraFeedInjectionPS::FParameters* PassParameters = GraphBuilder.AllocParameters<FCameraFeedInjectionPS::FParameters>();
 
@@ -150,8 +121,6 @@ void FCompUtilsViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FScene
 		PassParameters->CameraColorTexture = CameraTextures.ColorTexture->GetResource()->TextureRHI;
 		PassParameters->CameraDepthTexture = CameraTextures.DepthTexture->GetResource()->TextureRHI;
 		PassParameters->CameraNormalsTexture = CameraTextures.NormalsTexture->GetResource()->TextureRHI;
-
-		PassParameters->ReprojectionUVMap = GraphBuilder.CreateSRV(ReprojectionUVMap);
 
 		// Get virtual camera properties (which will match the film camera if one is in use)
 		{
@@ -199,7 +168,7 @@ void FCompUtilsViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FScene
 		TShaderMapRef<FScreenPassVS> VertexShader(ShaderMap);
 
 		FCameraFeedInjectionPS::FPermutationDomain Permutation;
-		Permutation.Set<FCameraFeedInjectionPS::FColorSourceDepthCamera>(true);
+		Permutation.Set<FCameraFeedInjectionPS::FAlignColor>(CaptureActor->bAlignColorAndNormals);
 		TShaderMapRef<FCameraFeedInjectionPS> PixelShader(ShaderMap, Permutation);
 
 		FScreenPassTextureViewport ViewPort(ViewInfo.ViewRect.Size());

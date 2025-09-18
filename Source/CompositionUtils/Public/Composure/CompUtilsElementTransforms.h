@@ -143,6 +143,29 @@ public:
 
 
 /**
+ * Programmatically adds a crosshair to an image to assist with calibration and alignment.
+ */
+UCLASS(BlueprintType, Blueprintable)
+class COMPOSITIONUTILS_API UCompositionUtilsAddCrosshairPass : public UCompositingElementTransform
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	FLinearColor Color{ 1.0f, 1.0f, 0.0f };
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled", ClampMin="0"))
+	int32 Width = 4;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled", ClampMin="0"))
+	int32 Length = 50;
+
+public:
+	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
+};
+
+
+/**
  * To be able to preview the depth image directly in the preview window
  */
 UCLASS(BlueprintType, Blueprintable)

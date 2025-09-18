@@ -1,0 +1,28 @@
+#include "/Engine/Private/Common.ush"
+#include "/Engine/Private/ScreenPass.ush"
+
+SCREEN_PASS_TEXTURE_VIEWPORT(OutViewPort)
+SCREEN_PASS_TEXTURE_VIEWPORT(InViewPort)
+
+Texture2D InTex;
+SamplerState sampler0; // Bilinear sampler to perform interpolation
+
+float4 CrosshairColor;
+uint CrosshairWidth;
+uint CrosshairLength;
+
+float4 AddCrosshairPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	float2 OffsetPixelCoord = abs((InUV - 0.5f) * InViewPort_Extent);
+
+	float4 Col = InTex.Sample(sampler0, InUV);
+
+	if (any(OffsetPixelCoord < CrosshairWidth) && all(OffsetPixelCoord < CrosshairLength))
+	{
+		Col = CrosshairColor;
+	}
+		
+	return Col;
+}

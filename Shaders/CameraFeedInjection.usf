@@ -3,8 +3,8 @@
 
 #include "/Engine/Private/DeferredShadingCommon.ush"
 
-#ifndef COlOR_SOURCE_DEPTH_CAMERA
-#define COlOR_SOURCE_DEPTH_CAMERA 1
+#ifndef ALIGN_COLOR
+#define ALIGN_COLOR 1
 #endif
 
 
@@ -14,8 +14,6 @@ SCREEN_PASS_TEXTURE_VIEWPORT(OutputViewPort)
 Texture2D<float4> CameraColorTexture;
 Texture2D<float4> CameraDepthTexture;
 Texture2D<float4> CameraNormalsTexture;
-
-Texture2D<float2> ReprojectionUVMap;
 
 float4x4 VirtualCameraLocalToWorld;
 float4x4 VirtualCameraViewToNDC;
@@ -71,17 +69,7 @@ void InjectCameraFeedPS(
 	, out float OutDepth : SV_Depth
 )
 {
-	// Perform texture re-projection
-	// As described: https://dev.intelrealsense.com/docs/projection-texture-mapping-and-occlusion-with-intel-realsense-depth-cameras#32-texture-mapping
-	// TODO: Is bilinear filtering appropriate?
-	float2 DepthCameraUV = ReprojectionUVMap.Sample(View.SharedBilinearClampedSampler, InUV).rg;
-	if (any(DepthCameraUV < 0.0f))
-	{
-		// This point is out of the view of the depth camera
-		discard;
-	}
-
-	const float4 CameraDepthData = CameraDepthTexture.Sample(View.SharedBilinearClampedSampler, DepthCameraUV);
+	const float4 CameraDepthData = CameraDepthTexture.Sample(View.SharedBilinearClampedSampler, InUV);
 
 	const bool bDepthValid = CameraDepthData.a != 0;
 	if (!bDepthValid)
@@ -91,17 +79,31 @@ void InjectCameraFeedPS(
 	}
 	const float DeviceZ = ConvertToDeviceZ(CameraDepthData.r);
 
-	// If using depth camera for colour image, then use DepthCameraUV. If using main camera for colour image, then use InUV
+#if ALIGN_COLOR
+	float2 AlignedUV = CameraDepthData.gb;
+	if (any(AlignedUV < 0.0f))
+	{
+		// This point is out of the view of the depth camera
+		discard;
+	}
+#endif
+
 	const float3 CameraColor = CameraColorTexture.Sample(View.SharedBilinearClampedSampler,
-#if COlOR_SOURCE_DEPTH_CAMERA
-		DepthCameraUV
+#if ALIGN_COLOR
+		AlignedUV
 #else
 		InUV
 #endif
 		).rgb;
 	float3 Albedo = CameraColor * AlbedoMultiplier;
 
-	float3 ViewSpaceNormal = normalize(CameraNormalsTexture.Sample(View.SharedBilinearClampedSampler, DepthCameraUV).rgb);
+	float3 ViewSpaceNormal = normalize(CameraNormalsTexture.Sample(View.SharedBilinearClampedSampler,
+#if ALIGN_COLOR
+		AlignedUV
+#else
+		InUV
+#endif
+		).rgb);
 	float3 WorldSpaceNormal = mul(float4(ViewSpaceNormal, 0.0f), VirtualCameraLocalToWorld).rgb;
 
 	// Encode into GBuffer data

@@ -323,6 +323,55 @@ UTexture* UCompositionUtilsRelightingPass::ApplyTransform_Implementation(UTextur
 }
 
 
+///////////////////////////////////////
+// UCompositionUtilsAddCrosshairPass //
+///////////////////////////////////////
+
+
+UTexture* UCompositionUtilsAddCrosshairPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
+{
+	if (!Input)
+		return Input;
+	check(Input->GetResource());
+
+	if (!TargetCamera || !TargetCamera->GetCameraComponent())
+		return Input;
+
+	FIntPoint Dims;
+	Dims.X = Input->GetResource()->GetSizeX();
+	Dims.Y = Input->GetResource()->GetSizeY();
+
+	UTextureRenderTarget2D* RenderTarget = RequestRenderTarget(Dims, PF_FloatRGBA);
+	if (!(RenderTarget && RenderTarget->GetResource()))
+		return Input;
+
+	ENQUEUE_RENDER_COMMAND(AddCrosshairPass)(
+		[this, InputResource = Input->GetResource(), OutputResource = RenderTarget->GetResource()]
+		(FRHICommandListImmediate& RHICmdList)
+		{
+			FRDGBuilder GraphBuilder(RHICmdList);
+
+			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("CompUtilsAddCrosshairPass.Input"));
+			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("CompUtilsAddCrosshairPass.Output"));
+			FRDGTextureRef InTexture = GraphBuilder.RegisterExternalTexture(InputRT);
+			FRDGTextureRef OutTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
+
+			CompositionUtils::ExecuteAddCrosshairPipeline(
+				GraphBuilder,
+				FVector4f(Color),
+				static_cast<uint32>(Width),
+				static_cast<uint32>(Length),
+				InTexture,
+				OutTexture
+			);
+
+			GraphBuilder.Execute();
+		});
+
+	return RenderTarget;
+}
+
+
 ////////////////////////////////////////////
 // UCompositionUtilsDepthPreviewPass //
 ////////////////////////////////////////////

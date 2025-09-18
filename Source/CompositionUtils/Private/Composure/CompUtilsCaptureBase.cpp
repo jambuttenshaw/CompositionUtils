@@ -37,7 +37,7 @@ void ACompositionUtilsCaptureBase::FetchLatestCameraTextures_GameThread()
 
 	FCameraTexturesProxy Textures;
 	// FindNamedRenderResult must be called on game thread to avoid race conditions
-	Textures.ColorTexture = FindNamedRenderResult(CameraColorPassName);
+	Textures.ColorTexture = FindNamedRenderResult(bUseOverrideColorPass ? OverrideCameraColorPassName : CameraColorPassName);
 	Textures.DepthTexture = FindNamedRenderResult(CameraDepthPassName);
 	Textures.NormalsTexture = FindNamedRenderResult(CameraNormalsPassName);
 

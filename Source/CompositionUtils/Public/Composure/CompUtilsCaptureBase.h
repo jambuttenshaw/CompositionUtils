@@ -35,8 +35,14 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection")
 	bool bInjectionMode = false;
 
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode"))
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode&&!bUseOverrideColorPass"))
 	FName CameraColorPassName;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode"))
+	bool bUseOverrideColorPass = false;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode&&bUseOverrideColorPass"))
+	FName OverrideCameraColorPassName;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode"))
 	FName CameraDepthPassName;
@@ -50,12 +56,8 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode"))
 	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;
 
-	// If depth is already aligned then the reprojection UV map is not required
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode"))
-	bool bDepthAlreadyAligned = false;
-
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode"))
-	bool bDisableReprojectionUVMap = false;
+	bool bAlignColorAndNormals = false;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode"))
 	bool bExtractVolumetricFogInInjectionMode = false;

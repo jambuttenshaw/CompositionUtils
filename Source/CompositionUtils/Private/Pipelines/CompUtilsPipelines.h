@@ -128,21 +128,6 @@ namespace CompositionUtils
 	);
 
 
-	FRDGTextureRef CreateReprojectionUVMap(
-		FRDGBuilder& GraphBuilder,
-		const FMinimalViewInfo& VirtualCameraView,
-		FIntPoint TextureExtent,
-		const FAuxiliaryCameraData& AuxiliaryCameraData,
-		bool bPassThough = false // Optionally pass through - debug tool to enable / disable reprojection
-	);
-
-	void VisualizeReprojectionUVMap(
-		FRDGBuilder& GraphBuilder,
-		FRDGTextureRef ReprojectionUVMap,
-		FRDGTextureRef OutTexture
-	);
-
-
 	void VisualizeNormalMap(
 		FRDGBuilder& GraphBuilder,
 		bool bWorldSpace,
@@ -162,6 +147,16 @@ namespace CompositionUtils
 	void ExecuteRelightingPipeline(
 		FRDGBuilder& GraphBuilder,
 		const FRelightingParametersProxy& Parameters,
+		FRDGTextureRef InTexture,
+		FRDGTextureRef OutTexture
+	);
+
+
+	void ExecuteAddCrosshairPipeline(
+		FRDGBuilder& GraphBuilder,
+		const FVector4f& Color,
+		uint32 Width,
+		uint32 Length,
 		FRDGTextureRef InTexture,
 		FRDGTextureRef OutTexture
 	);
