@@ -56,8 +56,10 @@ RWTexture2D<float4> OutDepthTexture;
 Texture2D<float2> InUVMap;
 
 // Alignment requires atomics - so must use buffers of integer types
-Buffer<uint> InBuffer;
-RWBuffer<uint> OutBuffer;
+Buffer<uint64_t> InBuffer;
+RWStructuredBuffer<uint64_t> OutBuffer;
+
+RWStructuredBuffer<uint64_t> InitialClearBuffer;
 
 uint2 ViewDims;
 
@@ -84,7 +86,14 @@ void ConvertDepthTextureToBufferCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	else
 		DepthAsUint = ~DepthAsUint;
 
-	OutBuffer[Index] = DepthAsUint;
+	uint64_t DepthAsUint64 = DepthAsUint;
+	uint64_t IndexAsUint64 = Index;
+
+	uint64_t OutData = ((DepthAsUint64 << 32) & 0xFFFFFFFF00000000)
+					 | ( IndexAsUint64        & 0x0000000000FFFFFF);
+	OutBuffer[Index] = OutData;
+
+	InitialClearBuffer[Index] = 0xFF80000000000000;
 }
 
 // Due to differences in FOV, some pixels could remain blank resulting in holes in the output
@@ -101,10 +110,10 @@ void AlignDepthToColorCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	}
 
 	uint Index = PixelCoord.y * ViewDims.x + PixelCoord.x;
-	uint InData = InBuffer[Index];
+	uint64_t InData = InBuffer[Index];
 
 	float2 MappedUV = InUVMap[PixelCoord];
-	if (any(MappedUV < 0.0f) || isinf(InData))
+	if (any(MappedUV < 0.0f))
 	{
 		return;
 	}
@@ -134,7 +143,9 @@ void ConvertBufferToDepthTextureCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	}
 
 	uint Index = PixelCoord.y * ViewDims.x + PixelCoord.x;
-	uint DepthAsUint = InBuffer[Index];
+	uint64_t InData = InBuffer[Index];
+	uint DepthAsUint = uint(InData >> 32);
+	uint OriginalIndex = uint(InData & 0x0000000000FFFFFF); // The pixel index that this depth value originated from
 
 	// Using trick of interpreting float as uint to be use atomic min/max on float types from https://www.jeremyong.com/graphics/2023/09/05/f32-interlocked-min-max-hlsl/
 	float DepthValue;
@@ -147,6 +158,12 @@ void ConvertBufferToDepthTextureCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 		DepthValue = asfloat(DepthAsUint & ~(1u << 31));
 	}
 
-	float4 Output = float4(DepthValue.x, 0, 0, !isinf(DepthValue));
+	bool bValid = !isinf(DepthValue);
+
+	// Calculate inverse UV map
+	uint2 OriginalPixelCoord = uint2(OriginalIndex % ViewDims.x, OriginalIndex / ViewDims.x);
+	float2 OriginalUV = OriginalPixelCoord / float2(ViewDims - 0.5f);
+
+	float4 Output = float4(DepthValue, OriginalUV, bValid);
 	OutDepthTexture[PixelCoord] = Output;
 }

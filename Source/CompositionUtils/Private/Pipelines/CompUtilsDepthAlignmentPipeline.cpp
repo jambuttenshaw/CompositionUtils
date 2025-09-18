@@ -35,7 +35,8 @@ class FConvertDepthTextureToBufferCS : public FGlobalShader
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float4>, InDepthTexture)
-		SHADER_PARAMETER_RDG_BUFFER_UAV(RWBuffer<uint>, OutBuffer)
+		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<uint64_t>, OutBuffer)
+		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<uint64_t>, InitialClearBuffer)
 
 		SHADER_PARAMETER(FUintVector2, ViewDims)
 	END_SHADER_PARAMETER_STRUCT()
@@ -58,8 +59,8 @@ class FAlignDepthToColorCS : public FGlobalShader
 	SHADER_USE_PARAMETER_STRUCT(FAlignDepthToColorCS, FGlobalShader)
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER_RDG_BUFFER_SRV(Buffer<uint>, InBuffer)
-		SHADER_PARAMETER_RDG_BUFFER_UAV(RWBuffer<uint>, OutBuffer)
+		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<uint64_t>, InBuffer)
+		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<uint64_t>, OutBuffer)
 
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float2>, InUVMap)
 
@@ -85,7 +86,7 @@ class FConvertBufferToDepthTextureCS : public FGlobalShader
 	SHADER_USE_PARAMETER_STRUCT(FConvertBufferToDepthTextureCS, FGlobalShader)
 
 	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
-		SHADER_PARAMETER_RDG_BUFFER_SRV(Buffer<uint>, InBuffer)
+		SHADER_PARAMETER_RDG_BUFFER_SRV(StructuredBuffer<uint64_t>, InBuffer)
 		SHADER_PARAMETER_RDG_TEXTURE_UAV(RWTexture2D<float4>, OutDepthTexture)
 
 		SHADER_PARAMETER(FUintVector2, ViewDims)
@@ -177,11 +178,8 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 
 	FIntPoint Extent = InTexture->Desc.Extent;
 
-	FRDGTextureRef UVMap = GraphBuilder.CreateTexture(
-		FRDGTextureDesc::Create2D(Extent, PF_G32R32F, FClearValueBinding{{-1, -1, -1, -1}}, TexCreate_RenderTargetable | TexCreate_ShaderResource),
-		TEXT("CompUtils.DepthAlignment.UVMap")
-	);
-	AddClearRenderTargetPass(GraphBuilder, UVMap);
+	FRDGTextureDesc UVMapDesc = FRDGTextureDesc::Create2D(Extent, PF_G32R32F, FClearValueBinding{ {-1, -1, -1, -1} }, TexCreate_RenderTargetable | TexCreate_ShaderResource | TexCreate_UAV);
+	FRDGTextureRef UVMap = GraphBuilder.CreateTexture(UVMapDesc, TEXT("CompUtils.DepthAlignment.UVMap"));
 
 	FRDGTextureRef AlignedDepthTexture = GraphBuilder.CreateTexture(
 		FRDGTextureDesc::Create2D(Extent, PF_FloatRGBA, FClearValueBinding::Black, TexCreate_ShaderResource | TexCreate_UAV),
@@ -190,12 +188,8 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 	AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(AlignedDepthTexture), 0.0f);
 
 	uint32 BufferWidth = Extent.X * Extent.Y;
-
-	FRDGBufferDesc BufferDesc = FRDGBufferDesc::CreateBufferDesc(sizeof(uint32), BufferWidth);
-	FRDGBufferRef BufferA = GraphBuilder.CreateBuffer(BufferDesc, TEXT("CompUtils.DepthAlignment.BufferA"));
-	FRDGBufferRef BufferB = GraphBuilder.CreateBuffer(BufferDesc, TEXT("CompUtils.DepthAlignment.BufferB"));
-	AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(BufferA, PF_R32_UINT), 0xFF800000);
-	AddClearUAVPass(GraphBuilder, GraphBuilder.CreateUAV(BufferB, PF_R32_UINT), 0xFF800000);
+	FRDGBufferRef BufferA = CreateStructuredBuffer(GraphBuilder, TEXT("CompUtils.DepthAlignment.BufferA"), sizeof(uint64), BufferWidth, nullptr, 0);
+	FRDGBufferRef BufferB = CreateStructuredBuffer(GraphBuilder, TEXT("CompUtils.DepthAlignment.BufferB"), sizeof(uint64), BufferWidth, nullptr, 0);
 
 	// Create UV map
 	CompositionUtils::AddPass<FCalculateUVMapPS>(
@@ -219,7 +213,8 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 	{
 		FConvertDepthTextureToBufferCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FConvertDepthTextureToBufferCS::FParameters>();
 		PassParameters->InDepthTexture = GraphBuilder.CreateSRV(InTexture);
-		PassParameters->OutBuffer = GraphBuilder.CreateUAV(BufferA, PF_R32_UINT);
+		PassParameters->OutBuffer = GraphBuilder.CreateUAV(BufferA);
+		PassParameters->InitialClearBuffer = GraphBuilder.CreateUAV(BufferB);
 		PassParameters->ViewDims = FUintVector2(Extent.X, Extent.Y);
 
 		FGlobalShaderMap* ShaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
@@ -236,8 +231,8 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 	}
 	{
 		FAlignDepthToColorCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FAlignDepthToColorCS::FParameters>();
-		PassParameters->InBuffer = GraphBuilder.CreateSRV(BufferA, PF_R32_UINT);
-		PassParameters->OutBuffer = GraphBuilder.CreateUAV(BufferB, PF_R32_UINT);
+		PassParameters->InBuffer = GraphBuilder.CreateSRV(BufferA);
+		PassParameters->OutBuffer = GraphBuilder.CreateUAV(BufferB);
 		PassParameters->InUVMap = GraphBuilder.CreateSRV(UVMap);
 		PassParameters->ViewDims = FUintVector2( Extent.X, Extent.Y );
 
@@ -272,7 +267,7 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 	}
 	{
 		FConvertBufferToDepthTextureCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FConvertBufferToDepthTextureCS::FParameters>();
-		PassParameters->InBuffer = GraphBuilder.CreateSRV(BufferB, PF_R32_UINT);
+		PassParameters->InBuffer = GraphBuilder.CreateSRV(BufferB);
 		PassParameters->OutDepthTexture = GraphBuilder.CreateUAV(AlignedDepthTexture);
 		PassParameters->ViewDims = FUintVector2(Extent.X, Extent.Y);
 
