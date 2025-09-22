@@ -2,8 +2,9 @@
 
 #include "CompositionUtils.h"
 #include "RenderGraphBuilder.h"
-#include "CompositingElements/ICompositingTextureLookupTable.h"
+#include "RHIGPUReadback.h"
 
+#include "CompositingElements/ICompositingTextureLookupTable.h"
 #include "Composure/CompUtilsCaptureBase.h"
 #include "Pipelines/CompUtilsPipelines.h"
 
@@ -116,13 +117,11 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		return Input;
 	check(Input->GetResource());
 
-	FIntPoint Dims;
-	Dims.X = Input->GetResource()->GetSizeX();
-	Dims.Y = Input->GetResource()->GetSizeY();
-
-	UTextureRenderTarget2D* RenderTarget = RequestRenderTarget(Dims, PF_FloatRGBA);
-	if (!(RenderTarget && RenderTarget->GetResource()))
+	if (!(AuxiliaryCameraInputElement.IsValid() && VirtualCameraTargetActor.IsValid()))
+	{
+		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: One of AuxiliaryCameraInputElement or VirtualCameraTargetActor has not been assigned."));
 		return Input;
+	}
 
 	// Collect parameters
 	// If any fails then this will pass through with a warning
@@ -159,28 +158,86 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 
 	ParametersProxy.HoleFillingBias = static_cast<uint32>(HoleFillingBias);
 
+	// Calibration parameters
+	if (bCalibrationMode)
+	{
+		if (!InterestPointSpawnMin.ComponentwiseAllLessThan(InterestPointSpawnMax))
+		{
+			UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentCalibration: Degenerate point spawning rulers! Max must be greater than min."))
+			return Input;
+		}
+		ParametersProxy.CalibrationRulers = FVector4f{ InterestPointSpawnMin, InterestPointSpawnMax };
+		ParametersProxy.CalibrationPointCount = static_cast<uint32>(CalibrationPointCount);
+		ParametersProxy.bShowPoints = bShowPoints;
+	}
+
+	FIntPoint Dims;
+	Dims.X = Input->GetResource()->GetSizeX();
+	Dims.Y = Input->GetResource()->GetSizeY();
+
+	UTextureRenderTarget2D* RenderTarget = RequestRenderTarget(Dims, PF_FloatRGBA);
+	if (!(RenderTarget && RenderTarget->GetResource()))
+		return Input;
+
 	ENQUEUE_RENDER_COMMAND(ApplyDepthAlignmentPass)(
-		[Parameters = ParametersProxy, InputResource = Input->GetResource(), OutputResource = RenderTarget->GetResource()]
+		[this, bCalibrationMode_ = bCalibrationMode, bRunCalibration_ = bRunCalibration,
+				Parameters = ParametersProxy, InputResource = Input->GetResource(), OutputResource = RenderTarget->GetResource()]
 		(FRHICommandListImmediate& RHICmdList)
 		{
 			FRDGBuilder GraphBuilder(RHICmdList);
+			FRHIGPUBufferReadback CalibrationPointReadback("CalibrationPointReadback");
 
-			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("CompUtilsVolumetricsPass.Input"));
-			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("CompUtilsVolumetricsPass.Output"));
+			TRefCountPtr<IPooledRenderTarget> InputRT = CreateRenderTarget(InputResource->GetTextureRHI(), TEXT("CompUtilsDepthAlignmentPass.Input"));
+			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("CompUtilsDepthAlignmentPass.Output"));
 
 			// Set up RDG resources
 			FRDGTextureRef InColorTexture = GraphBuilder.RegisterExternalTexture(InputRT);
 			FRDGTextureRef OutColorTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
 
 			// Execute pipeline
-			CompositionUtils::ExecuteDepthAlignmentPipeline(
-				GraphBuilder,
-				Parameters,
-				InColorTexture,
-				OutColorTexture);
+			if (bCalibrationMode_)
+			{
+				CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
+					GraphBuilder,
+					Parameters,
+					InColorTexture,
+					OutColorTexture,
+					!bRunCalibration_,
+					CalibrationPointReadback);
+			}
+			else
+			{
+				CompositionUtils::ExecuteDepthAlignmentPipeline(
+					GraphBuilder,
+					Parameters,
+					InColorTexture,
+					OutColorTexture);
+			}
 
 			GraphBuilder.Execute();
+
+			if (bCalibrationMode_ && bRunCalibration_)
+			{
+				//Return the data back to the CPU thread
+				TFuture<void> Task = Async(EAsyncExecution::TaskGraph, [this, CalibrationPointReadbackTemp = std::move(CalibrationPointReadback)]
+					{
+						FRHIGPUBufferReadback& BufferReadback = *const_cast<FRHIGPUBufferReadback*>(&CalibrationPointReadbackTemp);
+
+						while (!BufferReadback.IsReady()) {}
+
+						ENQUEUE_RENDER_COMMAND(DepthAlignmentCalibrationReadback)(
+							[this, BufferReadbackTemp = std::move(BufferReadback)]
+							(FRHICommandListImmediate&)
+							{
+								FRHIGPUBufferReadback& BufferReadback = *const_cast<FRHIGPUBufferReadback*>(&BufferReadbackTemp);
+								CalibrateAlignment_RenderThread(BufferReadback);
+							});
+					});
+			}
 		});
+
+	// Reset calibration flag - don't want to execute calibration on successive frames
+	bRunCalibration = false;
 
 	return RenderTarget;
 }
@@ -197,6 +254,53 @@ void UCompositionUtilsDepthAlignmentPass::PostEditChangeProperty(struct FPropert
 	Super::PostEditChangeProperty(PropertyChangedEvent);
 }
 #endif
+
+void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGPUBufferReadback& Readback)
+{
+	// Read back calibration points and perform calibration
+	check(IsInRenderingThread());
+	check(Readback.IsReady());
+
+	TArray<FVector3f> Points;
+	Points.SetNum(CalibrationPointCount);
+
+	// Read bytes
+	{
+		uint64 NumBytes = sizeof(FVector3f) * CalibrationPointCount;
+		uint8* Bytes = static_cast<uint8*>(Readback.Lock(NumBytes));
+		FMemory::Memcpy(Points.GetData(), Bytes, NumBytes);
+		Readback.Unlock();
+	}
+
+	// Calculate plane of best fit
+	{
+		
+	}
+
+	// Deduce transform
+	{
+		// This is done in three steps. First, the normals of the two planes are aligned.
+		// Second, the tangents of the planes are aligned.
+		// This guarantees that the orthonormal bases of the planes are identical.
+		// Finally, translation is applied to line up the centroids of the planes.
+		// A final visual fine-tuning of an offset to the centroid is applied outside of calibration.
+	}
+
+
+	FTransform CalibratedTransform;
+
+	// Send transform to game thread
+	TFuture<void> Task = Async(EAsyncExecution::TaskGraphMainTick, [this, CalibratedTransform]
+		{
+			UpdateCalibratedAlignment_GameThread(CalibratedTransform);
+		});
+}
+
+void UCompositionUtilsDepthAlignmentPass::UpdateCalibratedAlignment_GameThread(const FTransform& CalibratedTransform)
+{
+	AuxiliaryToPrimaryNodalOffset = CalibratedTransform;
+}
+
 
 
 //////////////////////////////////////

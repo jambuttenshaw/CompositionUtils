@@ -1,4 +1,5 @@
 #include "CompUtilsPipelines.h"
+#include "RHIGPUReadback.h"
 
 DECLARE_GPU_STAT_NAMED(CompUtilsDepthAlignmentStat, TEXT("CompUtilsDepthAlignment"));
 
@@ -286,4 +287,134 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 
 	// Copy into output
 	AddCopyTexturePass(GraphBuilder, AlignedDepthTexture, OutTexture);
+}
+
+
+class FSpawnPointsAndDeprojectCS : public FGlobalShader
+{
+	DECLARE_GLOBAL_SHADER(FSpawnPointsAndDeprojectCS)
+	SHADER_USE_PARAMETER_STRUCT(FSpawnPointsAndDeprojectCS, FGlobalShader)
+
+	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
+		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float4>, InDepthTexture)
+		SHADER_PARAMETER_SAMPLER(SamplerState, DepthTextureSampler)
+
+		SHADER_PARAMETER(FMatrix44f, PhysicalNDCToView)
+		SHADER_PARAMETER(FVector4f, InvDeviceZToWorldZTransform)
+
+		SHADER_PARAMETER(uint32, NumPoints)
+		SHADER_PARAMETER(FVector4f, RulersMinAndMax)
+
+		SHADER_PARAMETER_RDG_BUFFER_UAV(RWStructuredBuffer<float3>, RWCalibrationPoints)
+	END_SHADER_PARAMETER_STRUCT()
+
+	static void ModifyCompilationEnvironment(const FGlobalShaderPermutationParameters& Parameters, FShaderCompilerEnvironment& OutEnvironment)
+	{
+		FGlobalShader::ModifyCompilationEnvironment(Parameters, OutEnvironment);
+		OutEnvironment.SetDefine(TEXT("THREADGROUP_SIZE_1D"), GetThreadGroupSize1D());
+	}
+
+	static uint32 GetThreadGroupSize1D() { return 32; }
+};
+
+IMPLEMENT_GLOBAL_SHADER(FSpawnPointsAndDeprojectCS, "/Plugin/CompositionUtils/DepthAlignment.usf", "SpawnPointsAndDeprojectCS", SF_Compute);
+
+
+class FVisualizePointSpawningPS : public FGlobalShader
+{
+	DECLARE_GLOBAL_SHADER(FVisualizePointSpawningPS)
+	SHADER_USE_PARAMETER_STRUCT(FVisualizePointSpawningPS, FGlobalShader)
+
+	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
+		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, OutViewPort)
+		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, InViewPort)
+		SHADER_PARAMETER_SAMPLER(SamplerState, sampler0)
+
+		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float4>, InTex)
+
+		SHADER_PARAMETER(uint32, NumPoints)
+		SHADER_PARAMETER(FVector4f, RulersMinAndMax)
+
+		SHADER_PARAMETER(uint32, bShowPoints)
+
+		RENDER_TARGET_BINDING_SLOTS()
+	END_SHADER_PARAMETER_STRUCT()
+};
+
+IMPLEMENT_GLOBAL_SHADER(FVisualizePointSpawningPS, "/Plugin/CompositionUtils/DepthAlignment.usf", "VisualizePointSpawningPS", SF_Pixel);
+
+
+void CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
+	FRDGBuilder& GraphBuilder, 
+	const FDepthAlignmentParametersProxy& Parameters, 
+	FRDGTextureRef InTexture, 
+	FRDGTextureRef OutTexture,
+	bool bVisualizeOnly,
+	FRHIGPUBufferReadback& CalibrationPointReadback)
+{
+	// Visualize rulers + points for helpful user feedback
+	CompositionUtils::AddPass<FVisualizePointSpawningPS>(
+		GraphBuilder,
+		RDG_EVENT_NAME("CompUtils.Calibration.VisualizePointSpawning"),
+		OutTexture,
+		[&](auto PassParameters)
+		{
+			PassParameters->InTex = GraphBuilder.CreateSRV(InTexture);
+			PassParameters->NumPoints = Parameters.CalibrationPointCount;
+			PassParameters->RulersMinAndMax = Parameters.CalibrationRulers;
+
+			PassParameters->bShowPoints = Parameters.bShowPoints ? 1 : 0;
+		}
+	);
+
+	if (bVisualizeOnly)
+	{
+		return;
+	}
+		
+	FRDGBufferRef CalibrationPointsBuffer = CreateStructuredBuffer(GraphBuilder, TEXT("CompositionUtils.DepthAlignment.CalibrationPoints"),
+															 sizeof(FVector3f), Parameters.CalibrationPointCount, nullptr, 0);
+
+	// Spawn points within rulers in screen space and reproject to 3D space
+	// Then readback so that a plane of best fit can be estimated
+	{
+		FSpawnPointsAndDeprojectCS::FParameters* PassParameters = GraphBuilder.AllocParameters<FSpawnPointsAndDeprojectCS::FParameters>();
+		PassParameters->InDepthTexture = GraphBuilder.CreateSRV(InTexture);
+		PassParameters->DepthTextureSampler = TStaticSamplerState<SF_Point>::GetRHI();
+
+		PassParameters->PhysicalNDCToView = Parameters.AuxiliaryCameraData.NDCToViewMatrix;
+		PassParameters->InvDeviceZToWorldZTransform = CreateInvDeviceZToWorldZTransform(static_cast<FMatrix>(Parameters.AuxiliaryCameraData.ViewToNDCMatrix));
+
+		PassParameters->NumPoints = Parameters.CalibrationPointCount;
+		PassParameters->RulersMinAndMax = Parameters.CalibrationRulers;
+
+		PassParameters->RWCalibrationPoints = GraphBuilder.CreateUAV(CalibrationPointsBuffer);
+
+		FGlobalShaderMap* ShaderMap = GetGlobalShaderMap(GMaxRHIFeatureLevel);
+		TShaderMapRef<FSpawnPointsAndDeprojectCS> ComputeShader(ShaderMap);
+
+		FIntVector GroupCount = FComputeShaderUtils::GetGroupCount(Parameters.CalibrationPointCount, FSpawnPointsAndDeprojectCS::GetThreadGroupSize1D());
+
+		FComputeShaderUtils::AddPass(
+			GraphBuilder,
+			RDG_EVENT_NAME("CompUtils.SpawnPointsAndDeproject"),
+			ERDGPassFlags::Compute,
+			ComputeShader,
+			PassParameters,
+			GroupCount
+		);
+	}
+
+	// Copy data into readback
+	AddReadbackBufferPass(
+		GraphBuilder, 
+		RDG_EVENT_NAME("DepthAlignment.ReadbackCalibrationPoints"),
+		CalibrationPointsBuffer,
+		[&CalibrationPointReadback, CalibrationPointsBuffer](FRHICommandListImmediate& RHICmdList)
+		{
+			CalibrationPointReadback.EnqueueCopy(
+				RHICmdList,
+				CalibrationPointsBuffer->GetRHI()
+			);
+		});
 }

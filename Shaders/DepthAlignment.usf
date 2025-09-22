@@ -45,6 +45,9 @@ float2 CalculateUVMapPS(
 	return OutUV;
 }
 
+#ifndef THREADGROUP_SIZE_1D
+#define THREADGROUP_SIZE_1D 1
+#endif
 
 #ifndef THREADGROUP_SIZE_2D
 #define THREADGROUP_SIZE_2D 1
@@ -166,4 +169,85 @@ void ConvertBufferToDepthTextureCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 
 	float4 Output = float4(DepthValue, OriginalUV, bValid);
 	OutDepthTexture[PixelCoord] = Output;
+}
+
+
+
+/////~~~--- CALIBRATION ---~~~/////
+
+SamplerState DepthTextureSampler;
+RWStructuredBuffer<float3> RWCalibrationPoints;
+
+uint NumPoints;
+float4 RulersMinAndMax; // AABB defined by [RulersMinAndMax.xy, RulersMinAndMax.zw]
+
+float2 GenerateCalibrationPointUV(uint PointIndex)
+{
+	const float GoldenRatio = 1.61803398875f;
+
+	float x = (PointIndex + 1) * GoldenRatio;
+	float2 UV = float2(
+		x % 1.0f,
+		(float)(PointIndex + 1) / (float)(NumPoints + 1)
+	);
+
+	float2 Extent = RulersMinAndMax.zw - RulersMinAndMax.xy;
+	float2 RescaledUV = RulersMinAndMax.xy + UV * Extent;
+
+	return RescaledUV;
+}
+
+[numthreads(THREADGROUP_SIZE_1D, 1, 1)]
+void SpawnPointsAndDeprojectCS(uint3 DTid : SV_DispatchThreadID)
+{
+	uint PointID = DTid.x;
+	if (PointID >= NumPoints)
+	{
+		return;
+	}
+
+	// Generate sample
+	float2 PointUV = GenerateCalibrationPointUV(PointID);
+
+	// Transform into world space
+	float Depth = InDepthTexture.Sample(DepthTextureSampler, PointUV).r;
+	float DeviceZ = 1.0f / ((Depth + InvDeviceZToWorldZTransform[3]) * InvDeviceZToWorldZTransform[2]);
+
+	// De-project pixel into view space
+	float4 NDC = float4(PointUV * 2.0f - 1.0f, DeviceZ, 1.0f);
+	NDC.y = -NDC.y; // UV space has y-axis flipped from NDC
+
+	float4 Deprojected = mul(NDC, PhysicalNDCToView);
+	float3 PointWS = Deprojected.xyz / Deprojected.w;
+
+	RWCalibrationPoints[PointID] = PointWS;
+}
+
+
+uint bShowPoints;
+
+float4 VisualizePointSpawningPS(float2 InUV : TEXCOORD0) : SV_Target
+{
+	float4 DepthSample = InTex.Sample(sampler0, InUV);
+
+	float Depth = DepthSample.x;
+	bool bValid = DepthSample.w > 0.0f;
+
+	uint Cropped = (InUV.x < RulersMinAndMax.x)
+				 + (InUV.y < RulersMinAndMax.y)
+				 + (InUV.x > RulersMinAndMax.z)
+				 + (InUV.y > RulersMinAndMax.w);
+
+	bool bIsCoveredByPoint = false;
+	for (uint i = 0; i < NumPoints; i++)
+	{
+		float2 PointUV = GenerateCalibrationPointUV(i);
+
+		float2 PointCoord = PointUV * InViewPort_Extent;
+		float2 PixelCoord = InUV * InViewPort_Extent;
+
+		bIsCoveredByPoint |= length(PointCoord - PixelCoord) < 2.0f;
+	}
+
+	return float4(Depth, bIsCoveredByPoint && bShowPoints, pow(Cropped / 2.0f, 0.5f), bValid);
 }

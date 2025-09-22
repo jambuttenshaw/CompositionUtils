@@ -10,6 +10,8 @@
 #include "CompUtilsElementTransforms.generated.h"
 
 
+class FRHIGPUBufferReadback;
+
 UCLASS(BlueprintType, Blueprintable)
 class COMPOSITIONUTILS_API UCompositionUtilsDepthProcessingPass : public UCompositingElementTransform
 {
@@ -64,10 +66,10 @@ class COMPOSITIONUTILS_API UCompositionUtilsDepthAlignmentPass : public UComposi
 
 public:
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
 	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
 	TWeakObjectPtr<ACameraActor> VirtualCameraTargetActor;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
@@ -75,6 +77,26 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled", ClampMin="0", ClampMax="8"))
 	int32 HoleFillingBias = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	bool bCalibrationMode = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled&&bCalibrationMode"))
+	bool bRunCalibration = false;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled&&bCalibrationMode"))
+	int32 CalibrationPointCount = 32;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", 
+				meta = (DisplayAfter = "PassName", EditCondition = "bEnabled&&bCalibrationMode", ClampMin = "0", ClampMax = "1"))
+	FVector2f InterestPointSpawnMin{ 0.0f };
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", 
+				meta = (DisplayAfter = "PassName", EditCondition = "bEnabled&&bCalibrationMode", ClampMin = "0", ClampMax = "1"))
+	FVector2f InterestPointSpawnMax{ 1.0f };
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled&&bCalibrationMode"))
+	bool bShowPoints = true;
 
 public:
 	//~ Begin UCompositingElementTransform interface
@@ -86,6 +108,11 @@ public:
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 	//~ End UObject interface
+
+private:
+	// Reads data back from GPU to perform calibration
+	void CalibrateAlignment_RenderThread(FRHIGPUBufferReadback& Readback);
+	void UpdateCalibratedAlignment_GameThread(const FTransform& CalibratedTransform);
 
 private:
 	TWeakObjectPtr<UCompositionUtilsAuxiliaryCameraInput> AuxiliaryCameraInput;

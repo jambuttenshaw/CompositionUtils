@@ -37,6 +37,13 @@ struct FDepthAlignmentParametersProxy
 	FAuxiliaryCameraData AuxiliaryCameraData;
 
 	uint32 HoleFillingBias = 0;
+
+	// Calibration only
+	uint32 CalibrationPointCount = 64;
+	FVector4f CalibrationRulers{ 0.0f, 0.0f, 1.0f, 1.0f };
+
+	// Calibration Visualization
+	bool bShowPoints = true;
 };
 
 // Resources and parameters extracted from the scene render graph to be able to apply volumetric fog in composure
@@ -125,6 +132,15 @@ namespace CompositionUtils
 		const FDepthAlignmentParametersProxy& Parameters,
 		FRDGTextureRef InTexture,
 		FRDGTextureRef OutTexture
+	);
+
+	void ExecuteDepthAlignmentCalibrationPipeline(
+		FRDGBuilder& GraphBuilder,
+		const FDepthAlignmentParametersProxy& Parameters,
+		FRDGTextureRef InTexture,
+		FRDGTextureRef OutTexture,
+		bool bVisualizeOnly,
+		FRHIGPUBufferReadback& CalibrationPointReadback
 	);
 
 
