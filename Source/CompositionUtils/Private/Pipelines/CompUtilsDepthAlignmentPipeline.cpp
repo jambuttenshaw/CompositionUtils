@@ -418,3 +418,94 @@ void CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
 			);
 		});
 }
+
+
+// Translated to C++ from: https://www.ilikebigbits.com/2017_09_25_plane_from_points_2.html
+TOptional<FPlane4f> CompositionUtils::CalculatePlaneOfBestFit(const TArray<FVector3f>& Points)
+{
+	uint32 N = Points.Num();
+	if (N < 3)
+	{
+		return NullOpt;
+	}
+
+	FVector3f Sum{ 0.0f };
+	for (const auto& Point : Points)
+	{
+		Sum += Point;
+	}
+	FVector3f Centroid = Sum / static_cast<float>(N);
+
+	float XX{ 0.0f };
+	float XY{ 0.0f };
+	float XZ{ 0.0f };
+	float YY{ 0.0f };
+	float YZ{ 0.0f };
+	float ZZ{ 0.0f };
+
+	for (const auto& Point : Points)
+	{
+		FVector3f R = Point - Centroid;
+		XX += R.X * R.X;
+		XY += R.X * R.Y;
+		XZ += R.X * R.Z;
+		YY += R.Y * R.Y;
+		YZ += R.Y * R.Z;
+		ZZ += R.Z * R.Z;
+	}
+
+	XX /= static_cast<float>(N);
+	XY /= static_cast<float>(N);
+	XZ /= static_cast<float>(N);
+	YY /= static_cast<float>(N);
+	YZ /= static_cast<float>(N);
+	ZZ /= static_cast<float>(N);
+
+	FVector3f WeightedDir{ 0.0f };
+
+	{
+		float DetX = YY * ZZ - YZ * YZ;
+		FVector3f AxisDir{
+			DetX,
+			XZ * YZ - XY * ZZ,
+			XY * YZ - XZ * YY
+		};
+		float Weight = DetX * DetX;
+		if (WeightedDir.Dot(AxisDir) < 0.0f) { Weight = -Weight; }
+		WeightedDir += AxisDir * Weight;
+	}
+
+	{
+		float DetY = XX * ZZ - XZ * XZ;
+		FVector3f AxisDir{
+			XZ * YZ - XY * ZZ,
+			DetY,
+			XY * XZ - YZ * XX
+		};
+		float Weight = DetY * DetY;
+		if (WeightedDir.Dot(AxisDir) < 0.0f) { Weight = -Weight; }
+		WeightedDir += AxisDir * Weight;
+	}
+
+	{
+		float DetZ = XX * YY - XY * XY;
+		FVector3f AxisDir{
+			XY * YZ - XZ * YY,
+			XY * XZ - YZ * XX,
+			DetZ,
+		};
+		float Weight = DetZ * DetZ;
+		if (WeightedDir.Dot(AxisDir) < 0.0f) { Weight = -Weight; }
+		WeightedDir += AxisDir * Weight;
+	}
+
+	FVector3f Normal = WeightedDir;
+	if (Normal.Normalize())
+	{
+		return FPlane4f{ Centroid, Normal};
+	}
+	else
+	{
+		return NullOpt;
+	}
+}

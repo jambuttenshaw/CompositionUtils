@@ -273,9 +273,14 @@ void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGP
 	}
 
 	// Calculate plane of best fit
+	TOptional<FPlane4f> Plane = CompositionUtils::CalculatePlaneOfBestFit(Points);
+	if (!Plane)
 	{
-		
+		return;
 	}
+
+	auto Normal = Plane->GetNormal();
+	UE_LOG(LogCompositionUtils, Display, TEXT("Plane of best fit: %.2f, %.2f, %.2f, %.2f"), Normal.X, Normal.Y, Normal.Z, Plane->W);
 
 	// Deduce transform
 	{

@@ -229,4 +229,11 @@ namespace CompositionUtils
 			PassParameters
 		);
 	}
+
+
+	// Misc helpers
+
+	// Defined in CompUtilsDepthAlignmentPipeline.cpp
+	TOptional<FPlane4f> CalculatePlaneOfBestFit(const TArray<FVector3f>& Points);
+
 }
