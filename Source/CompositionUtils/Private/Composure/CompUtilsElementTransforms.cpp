@@ -237,7 +237,10 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		});
 
 	// Reset calibration flag - don't want to execute calibration on successive frames
-	bRunCalibration = false;
+	if (bRunCalibration)
+	{
+		bRunCalibration = !bImmediatelyResetCalibrationFlag;
+	}
 
 	return RenderTarget;
 }
@@ -274,13 +277,21 @@ void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGP
 
 	// Calculate plane of best fit
 	TOptional<FPlane4f> Plane = CompositionUtils::CalculatePlaneOfBestFit(Points);
-	if (!Plane)
+	if (!Plane || !Plane->IsValid())
 	{
 		return;
 	}
 
-	auto Normal = Plane->GetNormal();
-	UE_LOG(LogCompositionUtils, Display, TEXT("Plane of best fit: %.2f, %.2f, %.2f, %.2f"), Normal.X, Normal.Y, Normal.Z, Plane->W);
+	// We are using the convention that the camera is looking along +Z
+	// Therefore, a normal vector seen by the camera should be pointing somewhat towards it; so Z should always be less than 0
+	if (Plane->GetNormal().Z > 0.0f)
+	{
+		Plane = Plane->Flip();
+	}
+
+	//auto Normal = Plane->GetNormal();
+	//auto Origin = Plane->GetOrigin();
+	//UE_LOG(LogCompositionUtils, Display, TEXT("Plane of best fit: N=(%.2f, %.2f, %.2f) O=(%.2f, %.2f, %.2f)"), Normal.X, Normal.Y, Normal.Z, Origin.X, Origin.Y, Origin.Z);
 
 	// Deduce transform
 	{
@@ -289,8 +300,24 @@ void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGP
 		// This guarantees that the orthonormal bases of the planes are identical.
 		// Finally, translation is applied to line up the centroids of the planes.
 		// A final visual fine-tuning of an offset to the centroid is applied outside of calibration.
-	}
 
+		FVector3f TargetNormal{ 0, 0, -1 };
+		FVector3f TargetOrigin{ 0, 0, KnownDistance };
+
+		FVector3f Normal = Plane->GetNormal();
+		FVector3f Origin = Plane->GetOrigin();
+
+		// Step 1: Align normals
+		float AngleBetweenNormals = FMath::Acos(Normal | TargetNormal);
+		FVector3f RotationAxis = Normal ^ TargetNormal;
+
+		FQuat4f Rot{ RotationAxis, AngleBetweenNormals };
+
+		FVector3f RotatedNormal = Rot.RotateVector(Normal);
+		UE_LOG(LogCompositionUtils, Display, TEXT("Angle: %.1f, Normal: %.2f, %.2f, %.2f, Rotated normal: %.2f, %.2f, %.2f, Resulting Angle: %.1f"), 
+			FMath::RadiansToDegrees(AngleBetweenNormals), Normal.X, Normal.Y, Normal.Z, RotatedNormal.X, RotatedNormal.Y, RotatedNormal.Z, 
+			FMath::RadiansToDegrees(FMath::Acos(Normal | RotatedNormal)));
+	}
 
 	FTransform CalibratedTransform;
 
@@ -305,7 +332,6 @@ void UCompositionUtilsDepthAlignmentPass::UpdateCalibratedAlignment_GameThread(c
 {
 	AuxiliaryToPrimaryNodalOffset = CalibratedTransform;
 }
-
 
 
 //////////////////////////////////////

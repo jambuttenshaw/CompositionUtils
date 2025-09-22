@@ -471,7 +471,7 @@ TOptional<FPlane4f> CompositionUtils::CalculatePlaneOfBestFit(const TArray<FVect
 			XY * YZ - XZ * YY
 		};
 		float Weight = DetX * DetX;
-		if (WeightedDir.Dot(AxisDir) < 0.0f) { Weight = -Weight; }
+		if ((WeightedDir | AxisDir) < 0.0f) { Weight = -Weight; }
 		WeightedDir += AxisDir * Weight;
 	}
 
@@ -483,7 +483,7 @@ TOptional<FPlane4f> CompositionUtils::CalculatePlaneOfBestFit(const TArray<FVect
 			XY * XZ - YZ * XX
 		};
 		float Weight = DetY * DetY;
-		if (WeightedDir.Dot(AxisDir) < 0.0f) { Weight = -Weight; }
+		if ((WeightedDir | AxisDir) < 0.0f) { Weight = -Weight; }
 		WeightedDir += AxisDir * Weight;
 	}
 
@@ -495,7 +495,7 @@ TOptional<FPlane4f> CompositionUtils::CalculatePlaneOfBestFit(const TArray<FVect
 			DetZ,
 		};
 		float Weight = DetZ * DetZ;
-		if (WeightedDir.Dot(AxisDir) < 0.0f) { Weight = -Weight; }
+		if ((WeightedDir | AxisDir) < 0.0f) { Weight = -Weight; }
 		WeightedDir += AxisDir * Weight;
 	}
 
