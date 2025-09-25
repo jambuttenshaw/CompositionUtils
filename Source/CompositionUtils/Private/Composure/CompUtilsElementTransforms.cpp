@@ -3,6 +3,7 @@
 #include "CompositionUtils.h"
 #include "RenderGraphBuilder.h"
 #include "RHIGPUReadback.h"
+#include "TextureResource.h"
 
 #include "CompositingElements/ICompositingTextureLookupTable.h"
 #include "Composure/CompUtilsCaptureBase.h"
@@ -218,7 +219,6 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 
 			if (bCalibrationMode_ && bRunCalibration_)
 			{
-				//Return the data back to the CPU thread
 				TFuture<void> Task = Async(EAsyncExecution::TaskGraph, [this, CalibrationPointReadbackTemp = std::move(CalibrationPointReadback)]
 					{
 						FRHIGPUBufferReadback& BufferReadback = *const_cast<FRHIGPUBufferReadback*>(&CalibrationPointReadbackTemp);
@@ -296,27 +296,87 @@ void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGP
 	// Deduce transform
 	{
 		// This is done in three steps. First, the normals of the two planes are aligned.
-		// Second, the tangents of the planes are aligned.
-		// This guarantees that the orthonormal bases of the planes are identical.
-		// Finally, translation is applied to line up the centroids of the planes.
-		// A final visual fine-tuning of an offset to the centroid is applied outside of calibration.
+		// Second, the tangents of the planes are aligned. This is based on a rotation tuned by the user.
+		// Finally, translation is applied to line up the centroids of the planes. This is also additionally tuned by an offset supplied by user.
+		// In total, there are 4 transformations concatenated:
+		// - Normal alignment matrix
+		// - Tangent alignment matrix (always rotates about -Z axis)
+		// - 
 
 		FVector3f TargetNormal{ 0, 0, -1 };
 		FVector3f TargetOrigin{ 0, 0, KnownDistance };
 
 		FVector3f Normal = Plane->GetNormal();
+		check(Normal.Normalize());
 		FVector3f Origin = Plane->GetOrigin();
+
+		// Construct basis for plane
+		FVector3f Tangent = (Normal == FVector3f{ 0, 1, 0 })
+							? Normal ^ FVector3f{ 1, 0, 0 }
+							: Normal ^ FVector3f{ 0, 1, 0 };
+		FVector3f Bitangent = Normal ^ Tangent;
+		check(Bitangent.Normalize());
+		Tangent = Normal ^ Bitangent;
+		check(Tangent.IsNormalized());
+		
+		FMatrix44f PlaneBasis = FMatrix44f::Identity;
+		PlaneBasis.SetAxis(0, FVector4f{Tangent, 1});
+		PlaneBasis.SetAxis(1, FVector4f{Bitangent, 1});
+		PlaneBasis.SetAxis(2, FVector4f{Normal, 1});
 
 		// Step 1: Align normals
 		float AngleBetweenNormals = FMath::Acos(Normal | TargetNormal);
 		FVector3f RotationAxis = Normal ^ TargetNormal;
+		check(RotationAxis.Normalize());
 
-		FQuat4f Rot{ RotationAxis, AngleBetweenNormals };
+		FQuat4f AlignNormalRotation{ RotationAxis, AngleBetweenNormals };
+		FQuat4f AlignTangentRotation{ TargetNormal, FMath::DegreesToRadians(TangentAlignmentAngle) };
+		FQuat4f FinalRotation = AlignTangentRotation * AlignNormalRotation;
 
-		FVector3f RotatedNormal = Rot.RotateVector(Normal);
-		UE_LOG(LogCompositionUtils, Display, TEXT("Angle: %.1f, Normal: %.2f, %.2f, %.2f, Rotated normal: %.2f, %.2f, %.2f, Resulting Angle: %.1f"), 
-			FMath::RadiansToDegrees(AngleBetweenNormals), Normal.X, Normal.Y, Normal.Z, RotatedNormal.X, RotatedNormal.Y, RotatedNormal.Z, 
-			FMath::RadiansToDegrees(FMath::Acos(Normal | RotatedNormal)));
+		FMatrix44f RotationMatrix = FinalRotation.ToMatrix();
+
+		FMatrix44f RotatedPlaneBasis = PlaneBasis * RotationMatrix;
+
+		//FVector3f RotatedNormal = Rot.RotateVector(Normal);
+		FVector3f RotatedNormal = PlaneBasis.GetUnitAxis(EAxis::Type::Z);
+		float ResultingAngle = FMath::RadiansToDegrees(FMath::Acos(TargetNormal | RotatedNormal));
+
+		//UE_LOG(LogCompositionUtils, Display, 
+		//	TEXT("Normal: %s, Angle: %.1f, Rotation Axis: %s, Rotated normal: %s, Resulting Angle: %.2f"), 
+		//	*Normal.ToString(),
+		//	FMath::RadiansToDegrees(AngleBetweenNormals),
+		//	*RotationAxis.ToString(),
+		//	*RotatedNormal.ToString(), 
+		//	ResultingAngle);
+		//UE_LOG(LogCompositionUtils, Display,
+		//	TEXT("Basis: %s, Rotation Matrix: %s, Rotated Basis: %s"),
+		//	*PlaneBasis.ToString(),
+		//	*RotationMatrix.ToString(),
+		//	*RotatedPlaneBasis.ToString());
+		UE_LOG(LogCompositionUtils, Display, TEXT(
+		"Aligned Tangent: %s"
+		"Aligned Bitangent: %s"
+		"Aligned Normal: %s"
+		),
+			*RotatedPlaneBasis.GetUnitAxis(EAxis::Type::X).ToString(),
+			*RotatedPlaneBasis.GetUnitAxis(EAxis::Type::Y).ToString(),
+			*RotatedPlaneBasis.GetUnitAxis(EAxis::Type::Z).ToString()
+			);
+
+		/// Basis:				[-0.97  0.00  0.26  0.00]
+		///						[-0.16 -0.78 -0.61  0.00]
+		///						[-0.20  0.63 -0.75  0.00]
+		///						[ 0.00  0.00  0.00  1.00]
+		///			
+		///	Rotation Matrix:	[ 0.98  0.07  0.20  0.00]
+		///						[ 0.07  0.77 -0.63  0.00]
+		///						[-0.20  0.63  0.75  0.00]
+		///						[ 0.00  0.00  0.00  1.00]
+		///
+		///	Rotated Basis:		[-1.00  0.09  0.00  0.00]
+		///						[-0.09 -1.00  0.00  0.00]
+		///						[ 0.00  0.00 -1.00  0.00]
+		///						[ 0.00  0.00  0.00  1.00] 
 	}
 
 	FTransform CalibratedTransform;

@@ -104,6 +104,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bCalibrationMode"))
 	bool bShowPoints = true;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bCalibrationMode", ClampMin="-180", ClampMax="180"))
+	float TangentAlignmentAngle = 0.0f;
+
 public:
 	//~ Begin UCompositingElementTransform interface
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
