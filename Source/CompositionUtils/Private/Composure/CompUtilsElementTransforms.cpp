@@ -285,20 +285,15 @@ void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGP
 	// Calculate plane of best fit
 	TOptional<FPlane4f> Plane = CompositionUtils::CalculatePlaneOfBestFit(Points);
 	if (!Plane || !Plane->IsValid())
-	{
 		return;
-	}
 
 	// We are using the convention that the camera is looking along +Z
 	// Therefore, a normal vector seen by the camera should be pointing somewhat towards it; so Z should always be less than 0
 	if (Plane->GetNormal().Z > 0.0f)
-	{
 		Plane = Plane->Flip();
-	}
-
-	FTransform CalibratedTransform;
 
 	// Deduce transform
+	FTransform CalibratedTransform;
 	{
 		// This is done in three steps. First, the normals of the two planes are aligned.
 		// Second, the tangents of the planes are aligned. This is based on a rotation tuned by the user.
@@ -312,9 +307,9 @@ void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGP
 		FVector3f Centroid = Plane->GetOrigin();
 
 		// Construct basis for plane
-		FVector3f Tangent = (Normal == FVector3f{ 0, 1, 0 })
-							? Normal ^ FVector3f{ 1, 0, 0 }
-							: Normal ^ FVector3f{ 0, 1, 0 };
+		FVector3f Tangent = Normal ^ ((Normal == FVector3f{ 0, 1, 0 }) 
+									? FVector3f{ 1, 0, 0 }
+									: Normal ^ FVector3f{ 0, 1, 0 });
 		FVector3f Bitangent = Normal ^ Tangent;
 		check(Bitangent.Normalize());
 		Tangent = Normal ^ Bitangent;
@@ -331,8 +326,9 @@ void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGP
 
 		FVector3f Translation = (TargetOrigin - Centroid) + FVector3f(AlignmentOffset.X, AlignmentOffset.Y, 0);
 
-		FMatrix44f ExtrinsicMatrix = FinalRotation.ToMatrix();
+		FMatrix44f ExtrinsicMatrix = FMatrix44f::Identity;
 		ExtrinsicMatrix = ExtrinsicMatrix.ConcatTranslation(Translation);
+		ExtrinsicMatrix *= FinalRotation.ToMatrix();
 
 		CalibratedTransform.SetFromMatrix(static_cast<FMatrix>(ExtrinsicMatrix));
 	}
