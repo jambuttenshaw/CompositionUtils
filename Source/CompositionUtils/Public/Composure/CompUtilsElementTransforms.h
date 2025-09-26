@@ -79,33 +79,33 @@ public:
 	int32 HoleFillingBias = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
-	bool bCalibrationMode = false;
+	bool bShowCalibrationPoints = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bCalibrationMode"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
 	bool bRunCalibration = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bCalibrationMode"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
 	bool bImmediatelyResetCalibrationFlag = true;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bCalibrationMode"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bShowCalibrationPoints"))
 	int32 CalibrationPointCount = 32;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", 
-				meta = (EditCondition = "bEnabled&&bCalibrationMode", ClampMin = "0", ClampMax = "1"))
+				meta = (EditCondition = "bEnabled&&bShowCalibrationPoints", ClampMin = "0", ClampMax = "1"))
 	FVector2f InterestPointSpawnMin{ 0.0f };
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", 
-				meta = (EditCondition = "bEnabled&&bCalibrationMode", ClampMin = "0", ClampMax = "1"))
+				meta = (EditCondition = "bEnabled&&bShowCalibrationPoints", ClampMin = "0", ClampMax = "1"))
 	FVector2f InterestPointSpawnMax{ 1.0f };
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bCalibrationMode"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
 	float KnownDistance = 200.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bCalibrationMode"))
-	bool bShowPoints = true;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bCalibrationMode", ClampMin="-180", ClampMax="180"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled", ClampMin="-180", ClampMax="180"))
 	float TangentAlignmentAngle = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
+	FVector2D AlignmentOffset;
 
 public:
 	//~ Begin UCompositingElementTransform interface

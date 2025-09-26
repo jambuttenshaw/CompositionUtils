@@ -139,8 +139,14 @@ namespace CompositionUtils
 		const FDepthAlignmentParametersProxy& Parameters,
 		FRDGTextureRef InTexture,
 		FRDGTextureRef OutTexture,
-		bool bVisualizeOnly,
 		FRHIGPUBufferReadback& CalibrationPointReadback
+	);
+
+	void VisualizeDepthAlignmentCalibrationPoints(
+		FRDGBuilder& GraphBuilder,
+		const FDepthAlignmentParametersProxy& Parameters,
+		FRDGTextureRef InTexture,
+		FRDGTextureRef OutTexture
 	);
 
 

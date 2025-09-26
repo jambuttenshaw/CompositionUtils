@@ -160,7 +160,6 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 	ParametersProxy.HoleFillingBias = static_cast<uint32>(HoleFillingBias);
 
 	// Calibration parameters
-	if (bCalibrationMode)
 	{
 		if (!InterestPointSpawnMin.ComponentwiseAllLessThan(InterestPointSpawnMax))
 		{
@@ -169,7 +168,7 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		}
 		ParametersProxy.CalibrationRulers = FVector4f{ InterestPointSpawnMin, InterestPointSpawnMax };
 		ParametersProxy.CalibrationPointCount = static_cast<uint32>(CalibrationPointCount);
-		ParametersProxy.bShowPoints = bShowPoints;
+		ParametersProxy.bShowPoints = bShowCalibrationPoints;
 	}
 
 	FIntPoint Dims;
@@ -181,7 +180,7 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		return Input;
 
 	ENQUEUE_RENDER_COMMAND(ApplyDepthAlignmentPass)(
-		[this, bCalibrationMode_ = bCalibrationMode, bRunCalibration_ = bRunCalibration,
+		[this, bRunCalibration_ = bRunCalibration,
 				Parameters = ParametersProxy, InputResource = Input->GetResource(), OutputResource = RenderTarget->GetResource()]
 		(FRHICommandListImmediate& RHICmdList)
 		{
@@ -196,15 +195,23 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 			FRDGTextureRef OutColorTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
 
 			// Execute pipeline
-			if (bCalibrationMode_)
+			if (bRunCalibration_)
 			{
 				CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
 					GraphBuilder,
 					Parameters,
 					InColorTexture,
 					OutColorTexture,
-					!bRunCalibration_,
 					CalibrationPointReadback);
+			}
+
+			if (Parameters.bShowPoints)
+			{
+				CompositionUtils::VisualizeDepthAlignmentCalibrationPoints(
+					GraphBuilder,
+					Parameters,
+					InColorTexture,
+					OutColorTexture);
 			}
 			else
 			{
@@ -217,7 +224,7 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 
 			GraphBuilder.Execute();
 
-			if (bCalibrationMode_ && bRunCalibration_)
+			if (bRunCalibration_)
 			{
 				TFuture<void> Task = Async(EAsyncExecution::TaskGraph, [this, CalibrationPointReadbackTemp = std::move(CalibrationPointReadback)]
 					{
@@ -289,26 +296,20 @@ void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGP
 		Plane = Plane->Flip();
 	}
 
-	//auto Normal = Plane->GetNormal();
-	//auto Origin = Plane->GetOrigin();
-	//UE_LOG(LogCompositionUtils, Display, TEXT("Plane of best fit: N=(%.2f, %.2f, %.2f) O=(%.2f, %.2f, %.2f)"), Normal.X, Normal.Y, Normal.Z, Origin.X, Origin.Y, Origin.Z);
+	FTransform CalibratedTransform;
 
 	// Deduce transform
 	{
 		// This is done in three steps. First, the normals of the two planes are aligned.
 		// Second, the tangents of the planes are aligned. This is based on a rotation tuned by the user.
 		// Finally, translation is applied to line up the centroids of the planes. This is also additionally tuned by an offset supplied by user.
-		// In total, there are 4 transformations concatenated:
-		// - Normal alignment matrix
-		// - Tangent alignment matrix (always rotates about -Z axis)
-		// - 
 
 		FVector3f TargetNormal{ 0, 0, -1 };
 		FVector3f TargetOrigin{ 0, 0, KnownDistance };
 
 		FVector3f Normal = Plane->GetNormal();
 		check(Normal.Normalize());
-		FVector3f Origin = Plane->GetOrigin();
+		FVector3f Centroid = Plane->GetOrigin();
 
 		// Construct basis for plane
 		FVector3f Tangent = (Normal == FVector3f{ 0, 1, 0 })
@@ -318,68 +319,23 @@ void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGP
 		check(Bitangent.Normalize());
 		Tangent = Normal ^ Bitangent;
 		check(Tangent.IsNormalized());
-		
-		FMatrix44f PlaneBasis = FMatrix44f::Identity;
-		PlaneBasis.SetAxis(0, FVector4f{Tangent, 1});
-		PlaneBasis.SetAxis(1, FVector4f{Bitangent, 1});
-		PlaneBasis.SetAxis(2, FVector4f{Normal, 1});
 
 		// Step 1: Align normals
 		float AngleBetweenNormals = FMath::Acos(Normal | TargetNormal);
 		FVector3f RotationAxis = Normal ^ TargetNormal;
-		check(RotationAxis.Normalize());
+		check(RotationAxis.Normalize()); // Very important to normalize rotation axis
 
 		FQuat4f AlignNormalRotation{ RotationAxis, AngleBetweenNormals };
 		FQuat4f AlignTangentRotation{ TargetNormal, FMath::DegreesToRadians(TangentAlignmentAngle) };
 		FQuat4f FinalRotation = AlignTangentRotation * AlignNormalRotation;
 
-		FMatrix44f RotationMatrix = FinalRotation.ToMatrix();
+		FVector3f Translation = (TargetOrigin - Centroid) + FVector3f(AlignmentOffset.X, AlignmentOffset.Y, 0);
 
-		FMatrix44f RotatedPlaneBasis = PlaneBasis * RotationMatrix;
+		FMatrix44f ExtrinsicMatrix = FinalRotation.ToMatrix();
+		ExtrinsicMatrix = ExtrinsicMatrix.ConcatTranslation(Translation);
 
-		//FVector3f RotatedNormal = Rot.RotateVector(Normal);
-		FVector3f RotatedNormal = PlaneBasis.GetUnitAxis(EAxis::Type::Z);
-		float ResultingAngle = FMath::RadiansToDegrees(FMath::Acos(TargetNormal | RotatedNormal));
-
-		//UE_LOG(LogCompositionUtils, Display, 
-		//	TEXT("Normal: %s, Angle: %.1f, Rotation Axis: %s, Rotated normal: %s, Resulting Angle: %.2f"), 
-		//	*Normal.ToString(),
-		//	FMath::RadiansToDegrees(AngleBetweenNormals),
-		//	*RotationAxis.ToString(),
-		//	*RotatedNormal.ToString(), 
-		//	ResultingAngle);
-		//UE_LOG(LogCompositionUtils, Display,
-		//	TEXT("Basis: %s, Rotation Matrix: %s, Rotated Basis: %s"),
-		//	*PlaneBasis.ToString(),
-		//	*RotationMatrix.ToString(),
-		//	*RotatedPlaneBasis.ToString());
-		UE_LOG(LogCompositionUtils, Display, TEXT(
-		"Aligned Tangent: %s"
-		"Aligned Bitangent: %s"
-		"Aligned Normal: %s"
-		),
-			*RotatedPlaneBasis.GetUnitAxis(EAxis::Type::X).ToString(),
-			*RotatedPlaneBasis.GetUnitAxis(EAxis::Type::Y).ToString(),
-			*RotatedPlaneBasis.GetUnitAxis(EAxis::Type::Z).ToString()
-			);
-
-		/// Basis:				[-0.97  0.00  0.26  0.00]
-		///						[-0.16 -0.78 -0.61  0.00]
-		///						[-0.20  0.63 -0.75  0.00]
-		///						[ 0.00  0.00  0.00  1.00]
-		///			
-		///	Rotation Matrix:	[ 0.98  0.07  0.20  0.00]
-		///						[ 0.07  0.77 -0.63  0.00]
-		///						[-0.20  0.63  0.75  0.00]
-		///						[ 0.00  0.00  0.00  1.00]
-		///
-		///	Rotated Basis:		[-1.00  0.09  0.00  0.00]
-		///						[-0.09 -1.00  0.00  0.00]
-		///						[ 0.00  0.00 -1.00  0.00]
-		///						[ 0.00  0.00  0.00  1.00] 
+		CalibratedTransform.SetFromMatrix(static_cast<FMatrix>(ExtrinsicMatrix));
 	}
-
-	FTransform CalibratedTransform;
 
 	// Send transform to game thread
 	TFuture<void> Task = Async(EAsyncExecution::TaskGraphMainTick, [this, CalibratedTransform]
@@ -390,6 +346,7 @@ void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGP
 
 void UCompositionUtilsDepthAlignmentPass::UpdateCalibratedAlignment_GameThread(const FTransform& CalibratedTransform)
 {
+	check(IsInGameThread());
 	AuxiliaryToPrimaryNodalOffset = CalibratedTransform;
 }
 

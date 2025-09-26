@@ -349,29 +349,8 @@ void CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
 	const FDepthAlignmentParametersProxy& Parameters, 
 	FRDGTextureRef InTexture, 
 	FRDGTextureRef OutTexture,
-	bool bVisualizeOnly,
 	FRHIGPUBufferReadback& CalibrationPointReadback)
 {
-	// Visualize rulers + points for helpful user feedback
-	CompositionUtils::AddPass<FVisualizePointSpawningPS>(
-		GraphBuilder,
-		RDG_EVENT_NAME("CompUtils.Calibration.VisualizePointSpawning"),
-		OutTexture,
-		[&](auto PassParameters)
-		{
-			PassParameters->InTex = GraphBuilder.CreateSRV(InTexture);
-			PassParameters->NumPoints = Parameters.CalibrationPointCount;
-			PassParameters->RulersMinAndMax = Parameters.CalibrationRulers;
-
-			PassParameters->bShowPoints = Parameters.bShowPoints ? 1 : 0;
-		}
-	);
-
-	if (bVisualizeOnly)
-	{
-		return;
-	}
-		
 	FRDGBufferRef CalibrationPointsBuffer = CreateStructuredBuffer(GraphBuilder, TEXT("CompositionUtils.DepthAlignment.CalibrationPoints"),
 															 sizeof(FVector3f), Parameters.CalibrationPointCount, nullptr, 0);
 
@@ -417,6 +396,25 @@ void CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
 				CalibrationPointsBuffer->GetRHI()
 			);
 		});
+}
+
+
+void CompositionUtils::VisualizeDepthAlignmentCalibrationPoints(FRDGBuilder& GraphBuilder, const FDepthAlignmentParametersProxy& Parameters, FRDGTextureRef InTexture, FRDGTextureRef OutTexture)
+{
+	// Visualize rulers + points for helpful user feedback
+	CompositionUtils::AddPass<FVisualizePointSpawningPS>(
+		GraphBuilder,
+		RDG_EVENT_NAME("CompUtils.Calibration.VisualizePointSpawning"),
+		OutTexture,
+		[&](auto PassParameters)
+		{
+			PassParameters->InTex = GraphBuilder.CreateSRV(InTexture);
+			PassParameters->NumPoints = Parameters.CalibrationPointCount;
+			PassParameters->RulersMinAndMax = Parameters.CalibrationRulers;
+
+			PassParameters->bShowPoints = Parameters.bShowPoints ? 1 : 0;
+		}
+	);
 }
 
 
