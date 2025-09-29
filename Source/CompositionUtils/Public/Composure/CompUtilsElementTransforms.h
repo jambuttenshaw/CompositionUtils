@@ -72,20 +72,29 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
 	TWeakObjectPtr<ACameraActor> VirtualCameraTargetActor;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
 	FTransform AuxiliaryToPrimaryNodalOffset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	FVector2D AlignmentTranslationOffset;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	float AlignmentRotationOffset;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled", ClampMin="0", ClampMax="8"))
 	int32 HoleFillingBias = 0;
+
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
 	bool bShowCalibrationPoints = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
-	bool bRunCalibration = false;
+	bool bRunCalibrationOnNextPass = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
-	bool bImmediatelyResetCalibrationFlag = true;
+	bool bResetCalibration = false;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bShowCalibrationPoints"))
 	int32 CalibrationPointCount = 32;
@@ -101,11 +110,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
 	float KnownDistance = 200.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled", ClampMin="-180", ClampMax="180"))
-	float TangentAlignmentAngle = 0.0f;
+private:
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
-	FVector2D AlignmentOffset;
+	// Intermediate calibrated transform - before manual adjustments are applied.
+	// The final transform is re-calculated before the transform pass is applied
+	FVector3f CalibratedTranslation = FVector3f::ZeroVector;
+	FQuat4f CalibratedRotation = FQuat4f::Identity;
 
 public:
 	//~ Begin UCompositingElementTransform interface
@@ -121,7 +131,7 @@ public:
 private:
 	// Reads data back from GPU to perform calibration
 	void CalibrateAlignment_RenderThread(FRHIGPUBufferReadback& Readback);
-	void UpdateCalibratedAlignment_GameThread(const FTransform& CalibratedTransform);
+	void UpdateCalibration_GameThread(const FVector3f& Translation, const FQuat4f& Rotation);
 
 private:
 	TWeakObjectPtr<UCompositionUtilsAuxiliaryCameraInput> AuxiliaryCameraInput;
