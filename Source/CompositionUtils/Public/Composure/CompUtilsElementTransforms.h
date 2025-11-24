@@ -52,7 +52,7 @@ public:
 	//~ End UObject interface
 
 private:
-	TWeakObjectPtr<UCompositionUtilsAuxiliaryCameraInput> AuxiliaryCameraInput;
+	TWeakObjectPtr<UCompositionUtilsCameraInput> CameraInput;
 };
 
 
@@ -134,7 +134,7 @@ private:
 	void UpdateCalibration_GameThread(const FVector3f& Translation, const FQuat4f& Rotation);
 
 private:
-	TWeakObjectPtr<UCompositionUtilsAuxiliaryCameraInput> AuxiliaryCameraInput;
+	TWeakObjectPtr<UCompositionUtilsCameraInput> CameraInput;
 };
 
 

@@ -41,18 +41,6 @@ void ACompositionUtilsCaptureBase::FetchLatestCameraTextures_GameThread()
 	Textures.DepthTexture = FindNamedRenderResult(CameraDepthPassName);
 	Textures.NormalsTexture = FindNamedRenderResult(CameraNormalsPassName);
 
-	// If getting camera data fails then it will be default-initialized to acceptable default values.
-	// The output will not be correct but other than that nothing bad will happen
-	if (!AuxiliaryCameraInput.IsValid())
-	{
-		AuxiliaryCameraInput = UCompositionUtilsAuxiliaryCameraInput::TryGetAuxCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
-	}
-
-	if (AuxiliaryCameraInput.IsValid())
-	{
-		(void)AuxiliaryCameraInput->GetCameraData(Textures.AuxiliaryCameraData);
-	}
-
 	ENQUEUE_RENDER_COMMAND(UpdateCameraTextures)(
 	[this, TempTextures = MoveTemp(Textures)](FRHICommandListImmediate&)
 	{

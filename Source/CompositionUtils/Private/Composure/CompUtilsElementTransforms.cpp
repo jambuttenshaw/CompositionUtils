@@ -32,16 +32,16 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 
 	FDepthProcessingParametersProxy Params;
 
-	if (!AuxiliaryCameraInput.IsValid())
+	if (!CameraInput.IsValid())
 	{
-		AuxiliaryCameraInput = UCompositionUtilsAuxiliaryCameraInput::TryGetAuxCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
+		CameraInput = UCompositionUtilsCameraInput::TryGetCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
 	}
 
-	FAuxiliaryCameraData AuxCameraData;
-	if (AuxiliaryCameraInput.IsValid() && AuxiliaryCameraInput->GetCameraData(AuxCameraData))
+	FCompUtilsCameraIntrinsicData CameraIntrinsicData;
+	if (CameraInput.IsValid() && CameraInput->GetCameraIntrinsicData(CameraIntrinsicData))
 	{
-		Params.InvProjectionMatrix = AuxCameraData.NDCToViewMatrix;
-		Params.CameraNearClippingPlane = AuxCameraData.NearClipPlane;
+		Params.InvProjectionMatrix = CameraIntrinsicData.NDCToViewMatrix;
+		Params.CameraNearClippingPlane = CameraIntrinsicData.NearClipPlane;
 	}
 	else
 	{
@@ -99,7 +99,7 @@ void UCompositionUtilsDepthProcessingPass::PostEditChangeProperty(struct FProper
 	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCompositionUtilsDepthProcessingPass, AuxiliaryCameraInputElement))
 	{
-		AuxiliaryCameraInput = nullptr;
+		CameraInput = nullptr;
 	}
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -170,9 +170,9 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		AuxiliaryToPrimaryNodalOffset.SetFromMatrix(static_cast<FMatrix>(ExtrinsicMatrix));
 	}
 
-	if (!AuxiliaryCameraInput.IsValid())
-		AuxiliaryCameraInput = UCompositionUtilsAuxiliaryCameraInput::TryGetAuxCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
-	if (AuxiliaryCameraInput.IsValid() && AuxiliaryCameraInput->GetCameraData(ParametersProxy.AuxiliaryCameraData))
+	if (!CameraInput.IsValid())
+		CameraInput = UCompositionUtilsCameraInput::TryGetCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
+	if (CameraInput.IsValid() && CameraInput->GetCameraIntrinsicData(ParametersProxy.AuxiliaryCameraData))
 	{}
 	else
 	{
@@ -278,7 +278,7 @@ void UCompositionUtilsDepthAlignmentPass::PostEditChangeProperty(struct FPropert
 	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCompositionUtilsDepthAlignmentPass, AuxiliaryCameraInputElement))
 	{
-		AuxiliaryCameraInput = nullptr;
+		CameraInput = nullptr;
 	}
 
 	Super::PostEditChangeProperty(PropertyChangedEvent);

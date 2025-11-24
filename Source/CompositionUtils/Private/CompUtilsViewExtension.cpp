@@ -28,11 +28,6 @@ class FCameraFeedInjectionPS : public FGlobalShader
 		SHADER_PARAMETER_TEXTURE(Texture2D<float4>, CameraNormalsTexture)
 
 		SHADER_PARAMETER(FMatrix44f, VirtualCameraLocalToWorld)
-		SHADER_PARAMETER(FMatrix44f, VirtualCameraViewToNDC)
-		SHADER_PARAMETER(FMatrix44f, VirtualCameraNDCToView)
-
-		SHADER_PARAMETER(FMatrix44f, DepthCameraViewToNDC)
-		SHADER_PARAMETER(FMatrix44f, DepthCameraNDCToView)
 
 		SHADER_PARAMETER(float, AlbedoMultiplier)
 		SHADER_PARAMETER(float, AmbientMultiplier)
@@ -122,7 +117,7 @@ void FCompUtilsViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FScene
 		PassParameters->CameraDepthTexture = CameraTextures.DepthTexture->GetResource()->TextureRHI;
 		PassParameters->CameraNormalsTexture = CameraTextures.NormalsTexture->GetResource()->TextureRHI;
 
-		// Get virtual camera properties (which will match the film camera if one is in use)
+		// Virtual camera local to world is required to transform injected normals from local to world space
 		{
 			FMinimalViewInfo CameraView;
 			CaptureActor->SceneCaptureComponent2D->GetCameraView(0.0f, CameraView);
@@ -130,17 +125,8 @@ void FCompUtilsViewExtension::InjectCameraFeed(FRDGBuilder& GraphBuilder, FScene
 			FTransform CameraTransform;
 			CameraTransform.SetRotation(CameraView.Rotation.Quaternion());
 			CameraTransform.SetTranslation(CameraView.Location);
+			// TODO: Because the matrix has no scale - should be okay to not use inverse of transpose of transformation?
 			PassParameters->VirtualCameraLocalToWorld = static_cast<FMatrix44f>(CameraTransform.ToMatrixNoScale());
-
-			FMatrix CameraProjectionMatrix = CameraView.CalculateProjectionMatrix();
-			PassParameters->VirtualCameraViewToNDC = static_cast<FMatrix44f>(CameraProjectionMatrix);
-			PassParameters->VirtualCameraNDCToView = static_cast<FMatrix44f>(CameraProjectionMatrix.Inverse());
-		}
-
-		// Get physical depth camera properties
-		{
-			PassParameters->DepthCameraViewToNDC = CameraTextures.AuxiliaryCameraData.ViewToNDCMatrix;
-			PassParameters->DepthCameraNDCToView = CameraTextures.AuxiliaryCameraData.NDCToViewMatrix;
 		}
 
 		PassParameters->AmbientMultiplier = CaptureActor->AmbientMultiplier;

@@ -1,17 +1,17 @@
 #include "Composure/CompUtilsElementInput.h"
 
-TWeakObjectPtr<UCompositionUtilsAuxiliaryCameraInput> UCompositionUtilsAuxiliaryCameraInput::TryGetAuxCameraInputPassFromCompositingElement(const TWeakObjectPtr<ACompositingElement>& CompositingElement)
+TWeakObjectPtr<UCompositionUtilsCameraInput> UCompositionUtilsCameraInput::TryGetCameraInputPassFromCompositingElement(const TWeakObjectPtr<ACompositingElement>& CompositingElement)
 {
-	TWeakObjectPtr<UCompositionUtilsAuxiliaryCameraInput> OutPtr;
+	TWeakObjectPtr<UCompositionUtilsCameraInput> OutPtr;
 
 	if (CompositingElement.IsValid())
 	{
 		UTexture* Unused;
-		if (UCompositingElementInput* InputPass = CompositingElement->FindInputPass(UCompositionUtilsAuxiliaryCameraInput::StaticClass(), Unused))
+		if (UCompositingElementInput* InputPass = CompositingElement->FindInputPass(UCompositionUtilsCameraInput::StaticClass(), Unused))
 		{
-			if (UCompositionUtilsAuxiliaryCameraInput* AuxiliaryCameraInputPass = Cast<UCompositionUtilsAuxiliaryCameraInput>(InputPass))
+			if (UCompositionUtilsCameraInput* CameraInputPass = Cast<UCompositionUtilsCameraInput>(InputPass))
 			{
-				OutPtr = AuxiliaryCameraInputPass;
+				OutPtr = CameraInputPass;
 			}
 		}
 	}

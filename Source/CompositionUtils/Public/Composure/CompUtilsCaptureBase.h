@@ -13,10 +13,6 @@ struct FCameraTexturesProxy
 	UTexture* ColorTexture   = nullptr;
 	UTexture* DepthTexture   = nullptr;
 	UTexture* NormalsTexture = nullptr;
-
-	// Optional - contains properties of auxiliary camera (that is providing depth)
-	// Note that ColorTexture and DepthTexture may come from different physical cameras
-	FAuxiliaryCameraData AuxiliaryCameraData;
 };
 
 
@@ -53,12 +49,6 @@ public:
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode"))
 	FName CameraNormalsPassName;
 
-	// This should be the input pass name of the pass that feeds the depth image. It should be of type UCompositionUtilsAuxiliaryCameraInput.
-	// This is required to get properties of the camera to align the depth image with the colour image.
-	// Not necessary when colour and depth are coming from the same camera source.
-	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "Composure|Injection", meta = (EditCondition = "bInjectionMode"))
-	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;
-
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category="Composure|Injection", meta=(EditCondition="bInjectionMode"))
 	bool bExtractVolumetricFogInInjectionMode = false;
 
@@ -83,7 +73,7 @@ protected:
 	FVolumetricFogRequiredDataProxy* GetVolumetricFogData();
 
 private:
-	TWeakObjectPtr<UCompositionUtilsAuxiliaryCameraInput> AuxiliaryCameraInput;
+	TWeakObjectPtr<UCompositionUtilsCameraInput> AuxiliaryCameraInput;
 
 public:
 	// Call this in GenerateInputs before rendering the scene capture

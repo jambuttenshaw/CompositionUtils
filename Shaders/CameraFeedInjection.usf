@@ -16,11 +16,6 @@ Texture2D<float4> CameraDepthTexture;
 Texture2D<float4> CameraNormalsTexture;
 
 float4x4 VirtualCameraLocalToWorld;
-float4x4 VirtualCameraViewToNDC;
-float4x4 VirtualCameraNDCToView;
-
-float4x4 DepthCameraViewToNDC;
-float4x4 DepthCameraNDCToView;
 
 // Parameters to customize how the lighting affects the camera image
 float AmbientMultiplier;
@@ -69,6 +64,7 @@ void InjectCameraFeedPS(
 	, out float OutDepth : SV_Depth
 )
 {
+	// When also aligning colour images, the UV map determining how alignment is performed is stored in red and blue channels
 	const float4 CameraDepthData = CameraDepthTexture.Sample(View.SharedBilinearClampedSampler, InUV);
 
 	const bool bDepthValid = CameraDepthData.a != 0;
