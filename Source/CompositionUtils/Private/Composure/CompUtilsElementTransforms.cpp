@@ -41,12 +41,10 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 	if (CameraInput.IsValid() && CameraInput->GetCameraIntrinsicData(CameraIntrinsicData))
 	{
 		Params.InvProjectionMatrix = CameraIntrinsicData.NDCToViewMatrix;
-		Params.CameraNearClippingPlane = CameraIntrinsicData.NearClipPlane;
 	}
 	else
 	{
 		Params.InvProjectionMatrix = FMatrix44f::Identity;
-		Params.CameraNearClippingPlane = 10.0f;
 	}
 
 	Params.bEnableJacobiSteps = bEnableJacobi;

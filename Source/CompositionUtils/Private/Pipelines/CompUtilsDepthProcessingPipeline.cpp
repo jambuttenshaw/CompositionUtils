@@ -91,7 +91,6 @@ class FDepthClippingPS : public FGlobalShader
 		SHADER_PARAMETER_SAMPLER(SamplerState, sampler0)
 
 		SHADER_PARAMETER(FMatrix44f, InvCameraProjectionMatrix)
-		SHADER_PARAMETER(float, CameraNearClippingPlane)
 		SHADER_PARAMETER(int32, bEnableFarClipping)
 		SHADER_PARAMETER(float, FarClipDistance)
 		SHADER_PARAMETER(int32, bEnableClippingPlane)
@@ -187,7 +186,6 @@ void CompositionUtils::ExecuteDepthProcessingPipeline(
 		[&](auto PassParameters)
 		{
 			PassParameters->InvCameraProjectionMatrix = Parameters.InvProjectionMatrix;
-			PassParameters->CameraNearClippingPlane = Parameters.CameraNearClippingPlane;
 			PassParameters->bEnableFarClipping = Parameters.bEnableFarClipping;
 			PassParameters->FarClipDistance = Parameters.FarClipDistance;
 			PassParameters->bEnableClippingPlane = Parameters.bEnableClippingPlane;

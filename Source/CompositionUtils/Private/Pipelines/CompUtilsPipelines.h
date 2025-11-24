@@ -10,7 +10,6 @@ struct FDepthProcessingParametersProxy
 {
 	// Camera properties
 	FMatrix44f InvProjectionMatrix; // for projecting points into view space
-	float CameraNearClippingPlane;
 
 	// Relaxation parameters
 	bool bEnableJacobiSteps;

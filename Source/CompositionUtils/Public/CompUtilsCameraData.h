@@ -17,8 +17,6 @@ struct COMPOSITIONUTILS_API FCompUtilsCameraIntrinsicData
 	FMatrix44f ViewToNDCMatrix = FMatrix44f::Identity;	// Projection Matrix
 	FMatrix44f NDCToViewMatrix = FMatrix44f::Identity;	// Inv Projection Matrix
 
-	float NearClipPlane = 1.0f;							// In practice should be the minimum depth of the physical camera,
-														// but so long as it is consistent throughout compositing pipeline it should work regardless
 	float HorizontalFOV = 90.0f;
 	float VerticalFOV = 90.0f;
 };

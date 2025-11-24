@@ -89,7 +89,6 @@ float4 JacobiStepPS(
 
 // Camera matrix of Stereolabs camera to project into view space - to compare against planes
 float4x4 InvCameraProjectionMatrix;
-float CameraNearClippingPlane;
 // All depth values beyond this distance will be clipped
 int bEnableFarClipping;
 float FarClipDistance;
@@ -120,7 +119,7 @@ float4 DepthClipPS(
 	float2 NDCSpacePos = (InUV - 0.5f) * 2.0f * float2(1, -1);
 
 	float4 PosOnNearPlane = mul(float4(NDCSpacePos, 1, 1), InvCameraProjectionMatrix);
-	float3 DirToNearPlane = PosOnNearPlane.xyz / (PosOnNearPlane.w * CameraNearClippingPlane);
+	float3 DirToNearPlane = PosOnNearPlane.xyz / PosOnNearPlane.w;
 
 	float3 ViewSpacePos = DirToNearPlane * D.x;
 
