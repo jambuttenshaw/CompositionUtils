@@ -166,20 +166,13 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 	}
 
 	// Update nodal offset transform
+	if (!CalibrationData.IsNull() && CalibrationData.LoadSynchronous())
 	{
-		FMatrix44f ExtrinsicMatrix = FMatrix44f::Identity;
-
-		FQuat4f AlignTangentRotation{ FVector3f{ 0, 0, -1 }, FMath::DegreesToRadians(AlignmentRotationOffset) };
-		FQuat4f Rotation = AlignTangentRotation;
-		FVector3f Translation = FVector3f(AlignmentTranslationOffset.X, AlignmentTranslationOffset.Y, 0);
-
-		ExtrinsicMatrix = ExtrinsicMatrix.ConcatTranslation(Translation);
-		ExtrinsicMatrix *= Rotation.ToMatrix();
-
-		ParametersProxy.SourceToTargetNodalOffset = ExtrinsicMatrix;
-
-		// This is so users can see what data is in the nodal offset matrix for debugging
-		SourceToTargetNodalOffset.SetFromMatrix(static_cast<FMatrix>(ExtrinsicMatrix));
+		ParametersProxy.SourceToTargetNodalOffset = static_cast<FMatrix44f>(CalibrationData->ExtrinsicTransform.ToMatrixNoScale());
+	}
+	else
+	{
+		ParametersProxy.SourceToTargetNodalOffset = FMatrix44f::Identity;
 	}
 
 	ParametersProxy.HoleFillingBias = static_cast<uint32>(HoleFillingBias);

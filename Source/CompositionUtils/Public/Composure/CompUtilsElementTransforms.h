@@ -3,13 +3,12 @@
 #include "CoreMinimal.h"
 
 #include "CompositingElement.h"
+#include "ReprojectionCalibrationData.h"
 #include "CompositingElements/CompositingElementPasses.h"
 #include "Engine/DirectionalLight.h"
 
 #include "CompUtilsElementTransforms.generated.h"
 
-
-class FRHIGPUBufferReadback;
 
 UCLASS(BlueprintType, Blueprintable)
 class COMPOSITIONUTILS_API UCompositionUtilsDepthProcessingPass : public UCompositingElementTransform
@@ -64,18 +63,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
 	TWeakObjectPtr<ACompositingElement> TargetCamera;
 
-private:
-	// Debug purposes only - to be able to see what values are in the matrix
-	UPROPERTY(VisibleAnywhere, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	FTransform SourceToTargetNodalOffset;
-
-public:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	FVector2D AlignmentTranslationOffset;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	float AlignmentRotationOffset;
-
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	TSoftObjectPtr<UReprojectionCalibrationData> CalibrationData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled", ClampMin="0", ClampMax="8"))
 	int32 HoleFillingBias = 0;
