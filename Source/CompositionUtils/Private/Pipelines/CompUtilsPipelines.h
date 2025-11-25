@@ -24,18 +24,11 @@ struct FDepthProcessingParametersProxy
 
 struct FDepthAlignmentParametersProxy
 {
-	// TODO: Replace with another copy of FCompUtilsCameraIntrinsicData
-	// Virtual camera data
-	FMatrix44f VirtualCam_ViewToNDC;
-	FMatrix44f VirtualCam_NDCToView;
-	float VirtualCam_HorizontalFOV; // In Radians
-	float VirtualCam_AspectRatio;
+	FCompUtilsCameraIntrinsicData SourceCamera;
+	FCompUtilsCameraIntrinsicData TargetCamera;
 
 	// Extrinsic properties
-	FMatrix44f AuxiliaryToPrimaryNodalOffset;
-
-	// TODO: Rename to e.g. "Source/TargetIntrinsicData"
-	FCompUtilsCameraIntrinsicData AuxiliaryCameraData;
+	FMatrix44f SourceToTargetNodalOffset;
 
 	uint32 HoleFillingBias = 0;
 

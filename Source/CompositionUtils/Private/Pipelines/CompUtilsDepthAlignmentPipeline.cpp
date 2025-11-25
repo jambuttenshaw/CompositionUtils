@@ -201,11 +201,11 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 		{
 			PassParameters->InTex = GraphBuilder.CreateSRV(InTexture);
 
-			PassParameters->PhysicalNDCToView = Parameters.AuxiliaryCameraData.NDCToViewMatrix;
-			PassParameters->InvDeviceZToWorldZTransform = CreateInvDeviceZToWorldZTransform(static_cast<FMatrix>(Parameters.AuxiliaryCameraData.ViewToNDCMatrix));
+			PassParameters->PhysicalNDCToView = Parameters.SourceCamera.NDCToView;
+			PassParameters->InvDeviceZToWorldZTransform = CreateInvDeviceZToWorldZTransform(static_cast<FMatrix>(Parameters.SourceCamera.ViewToNDC));
 
-			PassParameters->PhysicalToVirtualOffset = Parameters.AuxiliaryToPrimaryNodalOffset;
-			PassParameters->VirtualViewToNDC = Parameters.VirtualCam_ViewToNDC;
+			PassParameters->PhysicalToVirtualOffset = Parameters.SourceToTargetNodalOffset;
+			PassParameters->VirtualViewToNDC = Parameters.TargetCamera.ViewToNDC;
 		}
 	);
 
@@ -239,10 +239,10 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 
 		// Calculate how big a patch size is required to avoid holes
 		{
-			float Physical_TanHalfFOVX = FMath::Tan(0.5f * Parameters.AuxiliaryCameraData.HorizontalFOV);
-			float Physical_TanHalfFOVY = FMath::Tan(0.5f * Parameters.AuxiliaryCameraData.VerticalFOV);
-			float Virtual_TanHalfFOVX  = FMath::Tan(0.5f * Parameters.VirtualCam_HorizontalFOV);
-			float Virtual_TanHalfFOVY = Virtual_TanHalfFOVX / Parameters.VirtualCam_AspectRatio;
+			float Physical_TanHalfFOVX = FMath::Tan(0.5f * Parameters.SourceCamera.HorizontalFOV);
+			float Physical_TanHalfFOVY = FMath::Tan(0.5f * Parameters.SourceCamera.VerticalFOV);
+			float Virtual_TanHalfFOVX  = FMath::Tan(0.5f * Parameters.TargetCamera.HorizontalFOV);
+			float Virtual_TanHalfFOVY  = FMath::Tan(0.5f * Parameters.TargetCamera.VerticalFOV);
 			FIntPoint PatchSize = {
 				FMath::CeilToInt(Physical_TanHalfFOVX / Virtual_TanHalfFOVX),
 				FMath::CeilToInt(Physical_TanHalfFOVY / Virtual_TanHalfFOVY)
@@ -361,8 +361,8 @@ void CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
 		PassParameters->InDepthTexture = GraphBuilder.CreateSRV(InTexture);
 		PassParameters->DepthTextureSampler = TStaticSamplerState<SF_Point>::GetRHI();
 
-		PassParameters->PhysicalNDCToView = Parameters.AuxiliaryCameraData.NDCToViewMatrix;
-		PassParameters->InvDeviceZToWorldZTransform = CreateInvDeviceZToWorldZTransform(static_cast<FMatrix>(Parameters.AuxiliaryCameraData.ViewToNDCMatrix));
+		PassParameters->PhysicalNDCToView = Parameters.SourceCamera.NDCToView;
+		PassParameters->InvDeviceZToWorldZTransform = CreateInvDeviceZToWorldZTransform(static_cast<FMatrix>(Parameters.SourceCamera.ViewToNDC));
 
 		PassParameters->NumPoints = Parameters.CalibrationPointCount;
 		PassParameters->RulersMinAndMax = Parameters.CalibrationRulers;

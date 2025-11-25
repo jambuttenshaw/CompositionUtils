@@ -40,7 +40,7 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 	FCompUtilsCameraIntrinsicData CameraIntrinsicData;
 	if (CameraInput.IsValid() && CameraInput->GetCameraIntrinsicData(CameraIntrinsicData))
 	{
-		Params.InvProjectionMatrix = CameraIntrinsicData.NDCToViewMatrix;
+		Params.InvProjectionMatrix = CameraIntrinsicData.NDCToView;
 	}
 	else
 	{
@@ -132,10 +132,12 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		VirtualCameraTargetActor->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
 
 		FMatrix ProjectionMatrix = VirtualCameraView.CalculateProjectionMatrix();
-		ParametersProxy.VirtualCam_ViewToNDC = static_cast<FMatrix44f>(ProjectionMatrix);
-		ParametersProxy.VirtualCam_NDCToView = static_cast<FMatrix44f>(ProjectionMatrix.Inverse());
-		ParametersProxy.VirtualCam_HorizontalFOV = FMath::DegreesToRadians(VirtualCameraView.FOV);
-		ParametersProxy.VirtualCam_AspectRatio = VirtualCameraView.AspectRatio;
+		ParametersProxy.TargetCamera.ViewToNDC = static_cast<FMatrix44f>(ProjectionMatrix);
+		ParametersProxy.TargetCamera.NDCToView = static_cast<FMatrix44f>(ProjectionMatrix.Inverse());
+		ParametersProxy.TargetCamera.HorizontalFOV = FMath::DegreesToRadians(VirtualCameraView.FOV);
+		// Calculate vertical FOV from horizontal FOV
+		ParametersProxy.TargetCamera.VerticalFOV = 
+			2.0f * FMath::Atan(FMath::Tan(0.5f * ParametersProxy.TargetCamera.HorizontalFOV) / VirtualCameraView.AspectRatio);
 	}
 	else
 	{
@@ -162,7 +164,7 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		ExtrinsicMatrix = ExtrinsicMatrix.ConcatTranslation(Translation);
 		ExtrinsicMatrix *= Rotation.ToMatrix();
 
-		ParametersProxy.AuxiliaryToPrimaryNodalOffset = ExtrinsicMatrix;
+		ParametersProxy.SourceToTargetNodalOffset = ExtrinsicMatrix;
 
 		// This is so users can see what data is in the nodal offset matrix for debugging
 		AuxiliaryToPrimaryNodalOffset.SetFromMatrix(static_cast<FMatrix>(ExtrinsicMatrix));
@@ -170,7 +172,7 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 
 	if (!CameraInput.IsValid())
 		CameraInput = UCompositionUtilsCameraInput::TryGetCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
-	if (CameraInput.IsValid() && CameraInput->GetCameraIntrinsicData(ParametersProxy.AuxiliaryCameraData))
+	if (CameraInput.IsValid() && CameraInput->GetCameraIntrinsicData(ParametersProxy.SourceCamera))
 	{}
 	else
 	{

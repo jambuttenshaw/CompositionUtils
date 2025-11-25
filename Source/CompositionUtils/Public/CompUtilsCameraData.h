@@ -14,9 +14,10 @@ struct COMPOSITIONUTILS_API FCompUtilsCameraIntrinsicData
 {
 	GENERATED_BODY()
 
-	FMatrix44f ViewToNDCMatrix = FMatrix44f::Identity;	// Projection Matrix
-	FMatrix44f NDCToViewMatrix = FMatrix44f::Identity;	// Inv Projection Matrix
+	FMatrix44f ViewToNDC = FMatrix44f::Identity;	// Projection Matrix
+	FMatrix44f NDCToView = FMatrix44f::Identity;	// Inv Projection Matrix
 
-	float HorizontalFOV = 90.0f;
-	float VerticalFOV = 90.0f;
+	// FOV is measured in radians
+	float HorizontalFOV = HALF_PI;
+	float VerticalFOV	= HALF_PI;
 };
