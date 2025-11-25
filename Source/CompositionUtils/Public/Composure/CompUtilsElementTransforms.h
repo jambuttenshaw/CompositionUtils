@@ -196,3 +196,21 @@ public:
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
 
 };
+
+
+/**
+ *	Uses an aligned depth texture to map another texture as if it had been taken from a different camera source
+ */
+UCLASS(BlueprintType, Blueprintable)
+class COMPOSITIONUTILS_API UCompositionUtilsTextureMappingPass : public UCompositingElementTransform
+{
+	GENERATED_BODY()
+
+public:
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	FName AlignedDepthPassName;
+
+public:
+	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
+
+};

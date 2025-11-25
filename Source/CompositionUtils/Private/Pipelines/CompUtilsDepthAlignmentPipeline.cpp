@@ -225,3 +225,46 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 	// Copy into output
 	AddCopyTexturePass(GraphBuilder, AlignedDepthTexture, OutTexture);
 }
+
+
+class FTextureMappingPS : public FGlobalShader
+{
+	DECLARE_GLOBAL_SHADER(FTextureMappingPS)
+	SHADER_USE_PARAMETER_STRUCT(FTextureMappingPS, FGlobalShader)
+
+	BEGIN_SHADER_PARAMETER_STRUCT(FParameters, )
+		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, OutViewPort)
+		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, InViewPort)
+		SHADER_PARAMETER_SAMPLER(SamplerState, sampler0)
+
+		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float4>, InTextureToMap)
+		// Output of Depth Alignment pipeline
+		// with depth in R and UV map in GB
+		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float4>, InAlignedDepth)
+
+		RENDER_TARGET_BINDING_SLOTS()
+	END_SHADER_PARAMETER_STRUCT()
+};
+
+IMPLEMENT_GLOBAL_SHADER(FTextureMappingPS, "/Plugin/CompositionUtils/DepthAlignment.usf", "TextureMappingPS", SF_Pixel);
+
+void CompositionUtils::ExecuteTextureMappingPipeline(
+	FRDGBuilder& GraphBuilder,
+	FRDGTextureRef InTextureToMap,
+	FRDGTextureRef InAlignedDepth,
+	FRDGTextureRef OutTexture)
+{
+	check(IsInRenderingThread());
+
+	// Create UV map
+	CompositionUtils::AddPass<FTextureMappingPS>(
+		GraphBuilder,
+		RDG_EVENT_NAME("CompUtils.TextureMapping"),
+		OutTexture,
+		[&](auto PassParameters)
+		{
+			PassParameters->InTextureToMap = GraphBuilder.CreateSRV(InTextureToMap);
+			PassParameters->InAlignedDepth = GraphBuilder.CreateSRV(InAlignedDepth);
+		}
+	);
+}

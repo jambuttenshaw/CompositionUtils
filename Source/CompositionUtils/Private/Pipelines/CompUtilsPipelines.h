@@ -132,6 +132,13 @@ namespace CompositionUtils
 		FRDGTextureRef OutTexture
 	);
 
+	void ExecuteTextureMappingPipeline(
+		FRDGBuilder& GraphBuilder,
+		FRDGTextureRef InTextureToMap,
+		FRDGTextureRef InAlignedDepth,
+		FRDGTextureRef OutTexture
+	);
+
 
 	void ExecuteDepthAlignmentCalibrationPipeline(
 		FRDGBuilder& GraphBuilder,

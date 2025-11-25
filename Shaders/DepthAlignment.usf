@@ -181,3 +181,28 @@ void ConvertBufferToDepthTextureCS(uint3 DispatchThreadId : SV_DispatchThreadID)
 	float4 Output = float4(DepthValue, OriginalUV, bValidFlag);
 	OutDepthTexture[PixelCoord] = Output;
 }
+
+
+/////////////////////
+// Texture Mapping //
+/////////////////////
+
+Texture2D<float4> InTextureToMap;
+Texture2D<float4> InAlignedDepth;
+
+float4 TextureMappingPS(
+	float2 InUV : TEXCOORD0
+) : SV_Target0
+{
+	const float4 CameraDepthData = InAlignedDepth.Sample(sampler0, InUV);
+
+	const bool bDepthValid = CameraDepthData.a != 0;
+	float2 AlignedUV = CameraDepthData.gb;
+
+	if (!bDepthValid || any(AlignedUV < 0.0f) || any(AlignedUV > 1.0f))
+	{
+		return float4(1.0f, 0.0f, 1.0f, 1.0f);
+	}
+
+	return InTextureToMap.Sample(sampler0, AlignedUV);
+}

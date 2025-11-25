@@ -541,9 +541,9 @@ void UCompositionUtilsDepthPreviewPass::ApplyVisualizeDepth(UTexture* Input, UTe
 }
 
 
-////////////////////////////////////////////////
+///////////////////////////////////////////
 // UCompositionUtilsNormalMapPreviewPass //
-////////////////////////////////////////////////
+///////////////////////////////////////////
 
 UTexture* UCompositionUtilsNormalMapPreviewPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
 {
@@ -587,6 +587,60 @@ UTexture* UCompositionUtilsNormalMapPreviewPass::ApplyTransform_Implementation(U
 				bWorldSpace,
 				LocalToWorld,
 				InTexture,
+				OutTexture
+			);
+
+			GraphBuilder.Execute();
+		});
+
+	return RenderTarget;
+}
+
+
+/////////////////////////////////////////
+// UCompositionUtilsTextureMappingPass //
+/////////////////////////////////////////
+
+UTexture* UCompositionUtilsTextureMappingPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
+{
+	if (!Input)
+		return Input;
+	check(Input->GetResource());
+
+	FIntPoint Dims;
+	Dims.X = Input->GetResource()->GetSizeX();
+	Dims.Y = Input->GetResource()->GetSizeY();
+
+	UTextureRenderTarget2D* RenderTarget = RequestRenderTarget(Dims, PF_FloatRGBA);
+	if (!(RenderTarget && RenderTarget->GetResource()))
+		return Input;
+
+	UTexture* AlignedDepth = nullptr;
+	bool bSuccess = PrePassLookupTable->FindNamedPassResult(AlignedDepthPassName, AlignedDepth);
+
+	if (!bSuccess)
+		return Input;
+
+	ENQUEUE_RENDER_COMMAND(ApplyRelightingPass)(
+		[TextureToMapResource = Input->GetResource(), AlignedDepthResource = AlignedDepth->GetResource(), OutputResource = RenderTarget->GetResource()]
+		(FRHICommandListImmediate& RHICmdList)
+		{
+			FRDGBuilder GraphBuilder(RHICmdList);
+
+			TRefCountPtr<IPooledRenderTarget> TextureToMapRT = CreateRenderTarget(TextureToMapResource->GetTextureRHI(), TEXT("CompUtilsTextureMappingPass.TextureToMap"));
+			TRefCountPtr<IPooledRenderTarget> AlignedDepthRT = CreateRenderTarget(AlignedDepthResource->GetTextureRHI(), TEXT("CompUtilsTextureMappingPass.AlignedDepth"));
+			TRefCountPtr<IPooledRenderTarget> OutputRT = CreateRenderTarget(OutputResource->GetTextureRHI(), TEXT("CompUtilsTextureMappingPass.Output"));
+
+			// Set up RDG resources
+			FRDGTextureRef InTextureToMap = GraphBuilder.RegisterExternalTexture(TextureToMapRT);
+			FRDGTextureRef InAlignedDepth = GraphBuilder.RegisterExternalTexture(AlignedDepthRT);
+			FRDGTextureRef OutTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
+
+			// Execute pipeline
+			CompositionUtils::ExecuteTextureMappingPipeline(
+				GraphBuilder,
+				InTextureToMap,
+				InAlignedDepth,
 				OutTexture
 			);
 
