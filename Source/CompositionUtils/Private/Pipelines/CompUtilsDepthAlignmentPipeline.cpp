@@ -17,8 +17,6 @@ class FCalculateUVMapPS : public FGlobalShader
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float4>, InTex)
 
 		SHADER_PARAMETER(FMatrix44f, PhysicalNDCToView)
-		SHADER_PARAMETER(FVector4f, InvDeviceZToWorldZTransform)
-
 		SHADER_PARAMETER(FMatrix44f, PhysicalToVirtualOffset)
 		SHADER_PARAMETER(FMatrix44f, VirtualViewToNDC)
 
@@ -105,66 +103,6 @@ class FConvertBufferToDepthTextureCS : public FGlobalShader
 IMPLEMENT_GLOBAL_SHADER(FConvertBufferToDepthTextureCS, "/Plugin/CompositionUtils/DepthAlignment.usf", "ConvertBufferToDepthTextureCS", SF_Compute);
 
 
-/**
- * Utility function borrowed from SceneView.cpp
- */
-static FVector4f CreateInvDeviceZToWorldZTransform(const FMatrix& ProjMatrix)
-{
-	// The perspective depth projection comes from the the following projection matrix:
-	//
-	// | 1  0  0  0 |
-	// | 0  1  0  0 |
-	// | 0  0  A  1 |
-	// | 0  0  B  0 |
-	//
-	// Z' = (Z * A + B) / Z
-	// Z' = A + B / Z
-	//
-	// So to get Z from Z' is just:
-	// Z = B / (Z' - A)
-	//
-	// Note a reversed Z projection matrix will have A=0.
-	//
-	// Done in shader as:
-	// Z = 1 / (Z' * C1 - C2)   --- Where C1 = 1/B, C2 = A/B
-	//
-
-	float DepthMul = (float)ProjMatrix.M[2][2];
-	float DepthAdd = (float)ProjMatrix.M[3][2];
-
-	if (DepthAdd == 0.f)
-	{
-		// Avoid dividing by 0 in this case
-		DepthAdd = 0.00000001f;
-	}
-
-	if (ProjMatrix.M[3][3] < 1.0f) // Perspective projection
-	{
-		float SubtractValue = DepthMul / DepthAdd;
-
-		// Subtract a tiny number to avoid divide by 0 errors in the shader when a very far distance is decided from the depth buffer.
-		// This fixes fog not being applied to the black background in the editor.
-		SubtractValue -= 0.00000001f;
-
-		return FVector4f(
-			0.0f,
-			0.0f,
-			1.0f / DepthAdd,
-			SubtractValue
-		);
-	}
-	else
-	{
-		return FVector4f(
-			(float)(1.0f / ProjMatrix.M[2][2]),
-			(float)(-ProjMatrix.M[3][2] / ProjMatrix.M[2][2] + 1.0f),
-			0.0f,
-			1.0f
-		);
-	}
-}
-
-
 void CompositionUtils::ExecuteDepthAlignmentPipeline(
 	FRDGBuilder& GraphBuilder,
 	const FDepthAlignmentParametersProxy& Parameters,
@@ -202,8 +140,6 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 			PassParameters->InTex = GraphBuilder.CreateSRV(InTexture);
 
 			PassParameters->PhysicalNDCToView = Parameters.SourceCamera.NDCToView;
-			PassParameters->InvDeviceZToWorldZTransform = CreateInvDeviceZToWorldZTransform(static_cast<FMatrix>(Parameters.SourceCamera.ViewToNDC));
-
 			PassParameters->PhysicalToVirtualOffset = Parameters.SourceToTargetNodalOffset;
 			PassParameters->VirtualViewToNDC = Parameters.TargetCamera.ViewToNDC;
 		}
@@ -300,7 +236,6 @@ class FSpawnPointsAndDeprojectCS : public FGlobalShader
 		SHADER_PARAMETER_SAMPLER(SamplerState, DepthTextureSampler)
 
 		SHADER_PARAMETER(FMatrix44f, PhysicalNDCToView)
-		SHADER_PARAMETER(FVector4f, InvDeviceZToWorldZTransform)
 
 		SHADER_PARAMETER(uint32, NumPoints)
 		SHADER_PARAMETER(FVector4f, RulersMinAndMax)
@@ -362,7 +297,6 @@ void CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
 		PassParameters->DepthTextureSampler = TStaticSamplerState<SF_Point>::GetRHI();
 
 		PassParameters->PhysicalNDCToView = Parameters.SourceCamera.NDCToView;
-		PassParameters->InvDeviceZToWorldZTransform = CreateInvDeviceZToWorldZTransform(static_cast<FMatrix>(Parameters.SourceCamera.ViewToNDC));
 
 		PassParameters->NumPoints = Parameters.CalibrationPointCount;
 		PassParameters->RulersMinAndMax = Parameters.CalibrationRulers;
