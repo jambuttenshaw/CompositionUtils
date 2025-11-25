@@ -11,7 +11,7 @@ class FSpawnPointsAndDeprojectCS : public FGlobalShader
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float4>, InDepthTexture)
 		SHADER_PARAMETER_SAMPLER(SamplerState, DepthTextureSampler)
 
-		SHADER_PARAMETER(FMatrix44f, PhysicalNDCToView)
+		SHADER_PARAMETER(FMatrix44f, SourceNDCToView)
 
 		SHADER_PARAMETER(uint32, NumPoints)
 		SHADER_PARAMETER(FVector4f, RulersMinAndMax)
@@ -28,7 +28,7 @@ class FSpawnPointsAndDeprojectCS : public FGlobalShader
 	static uint32 GetThreadGroupSize1D() { return 32; }
 };
 
-IMPLEMENT_GLOBAL_SHADER(FSpawnPointsAndDeprojectCS, "/Plugin/CompositionUtils/DepthAlignment.usf", "SpawnPointsAndDeprojectCS", SF_Compute);
+IMPLEMENT_GLOBAL_SHADER(FSpawnPointsAndDeprojectCS, "/Plugin/CompositionUtils/DepthCalibration.usf", "SpawnPointsAndDeprojectCS", SF_Compute);
 
 
 class FVisualizePointSpawningPS : public FGlobalShader
@@ -52,7 +52,7 @@ class FVisualizePointSpawningPS : public FGlobalShader
 	END_SHADER_PARAMETER_STRUCT()
 };
 
-IMPLEMENT_GLOBAL_SHADER(FVisualizePointSpawningPS, "/Plugin/CompositionUtils/DepthAlignment.usf", "VisualizePointSpawningPS", SF_Pixel);
+IMPLEMENT_GLOBAL_SHADER(FVisualizePointSpawningPS, "/Plugin/CompositionUtils/DepthCalibration.usf", "VisualizePointSpawningPS", SF_Pixel);
 
 
 void CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
@@ -72,7 +72,7 @@ void CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
 		PassParameters->InDepthTexture = GraphBuilder.CreateSRV(InTexture);
 		PassParameters->DepthTextureSampler = TStaticSamplerState<SF_Point>::GetRHI();
 
-		PassParameters->PhysicalNDCToView = Parameters.SourceCamera.NDCToView;
+		PassParameters->SourceNDCToView = Parameters.SourceCamera.NDCToView;
 
 		PassParameters->NumPoints = Parameters.CalibrationPointCount;
 		PassParameters->RulersMinAndMax = Parameters.CalibrationRulers;

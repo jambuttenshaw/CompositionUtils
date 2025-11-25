@@ -90,7 +90,7 @@ class FDepthClippingPS : public FGlobalShader
 		SHADER_PARAMETER_STRUCT(FScreenPassTextureViewportParameters, InViewPort)
 		SHADER_PARAMETER_SAMPLER(SamplerState, sampler0)
 
-		SHADER_PARAMETER(FMatrix44f, InvCameraProjectionMatrix)
+		SHADER_PARAMETER(FMatrix44f, SourceNDCToView)
 		SHADER_PARAMETER(int32, bEnableFarClipping)
 		SHADER_PARAMETER(float, FarClipDistance)
 		SHADER_PARAMETER(int32, bEnableClippingPlane)
@@ -134,6 +134,7 @@ void CompositionUtils::ExecuteDepthProcessingPipeline(
 )
 {
 	check(IsInRenderingThread());
+	check(Parameters.SourceCamera.Type == ECompUtilsCameraType::CameraType_Physical && TEXT("Depth processing pipeline is designed to only work with physical cameras."));
 
 	RDG_EVENT_SCOPE_STAT(GraphBuilder, CompUtilsDepthProcessingStat, "CompUtilsDepthProcessing");
 	RDG_GPU_STAT_SCOPE(GraphBuilder, CompUtilsDepthProcessingStat);
@@ -185,7 +186,8 @@ void CompositionUtils::ExecuteDepthProcessingPipeline(
 		OutTexture,
 		[&](auto PassParameters)
 		{
-			PassParameters->InvCameraProjectionMatrix = Parameters.InvProjectionMatrix;
+			PassParameters->SourceNDCToView = Parameters.SourceCamera.NDCToView;
+
 			PassParameters->bEnableFarClipping = Parameters.bEnableFarClipping;
 			PassParameters->FarClipDistance = Parameters.FarClipDistance;
 			PassParameters->bEnableClippingPlane = Parameters.bEnableClippingPlane;

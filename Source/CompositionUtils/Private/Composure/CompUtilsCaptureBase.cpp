@@ -66,8 +66,12 @@ bool ACompositionUtilsCaptureBase::GetCameraIntrinsicData(FCompUtilsCameraIntrin
 	CameraActor->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
 
 	FMatrix ProjectionMatrix = VirtualCameraView.CalculateProjectionMatrix();
+
+	OutData.Type = ECompUtilsCameraType::CameraType_Virtual;
+
 	OutData.ViewToNDC = static_cast<FMatrix44f>(ProjectionMatrix);
 	OutData.NDCToView = static_cast<FMatrix44f>(ProjectionMatrix.Inverse());
+
 	OutData.HorizontalFOV = FMath::DegreesToRadians(VirtualCameraView.FOV);
 	// Calculate vertical FOV from horizontal FOV
 	OutData.VerticalFOV =

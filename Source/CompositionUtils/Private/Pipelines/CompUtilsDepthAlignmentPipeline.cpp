@@ -15,9 +15,9 @@ class FCalculateUVMapPS : public FGlobalShader
 
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float4>, InTex)
 
-		SHADER_PARAMETER(FMatrix44f, PhysicalNDCToView)
-		SHADER_PARAMETER(FMatrix44f, PhysicalToVirtualOffset)
-		SHADER_PARAMETER(FMatrix44f, VirtualViewToNDC)
+		SHADER_PARAMETER(FMatrix44f, SourceNDCToView)
+		SHADER_PARAMETER(FMatrix44f, SourceToTargetNodalOffset)
+		SHADER_PARAMETER(FMatrix44f, TargetViewToNDC)
 
 		RENDER_TARGET_BINDING_SLOTS()
 	END_SHADER_PARAMETER_STRUCT()
@@ -109,6 +109,8 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 	FRDGTextureRef OutTexture)
 {
 	check(IsInRenderingThread());
+	check(Parameters.SourceCamera.Type == ECompUtilsCameraType::CameraType_Physical && 
+		TEXT("Depth alignment pipeline currently only supports using physical cameras as a source. This is due to how deprojection is implemented."));
 
 	RDG_EVENT_SCOPE_STAT(GraphBuilder, CompUtilsDepthAlignmentStat, "CompUtilsDepthAlignment");
 	RDG_GPU_STAT_SCOPE(GraphBuilder, CompUtilsDepthAlignmentStat);
@@ -138,9 +140,9 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 		{
 			PassParameters->InTex = GraphBuilder.CreateSRV(InTexture);
 
-			PassParameters->PhysicalNDCToView = Parameters.SourceCamera.NDCToView;
-			PassParameters->PhysicalToVirtualOffset = Parameters.SourceToTargetNodalOffset;
-			PassParameters->VirtualViewToNDC = Parameters.TargetCamera.ViewToNDC;
+			PassParameters->SourceNDCToView = Parameters.SourceCamera.NDCToView;
+			PassParameters->SourceToTargetNodalOffset = Parameters.SourceToTargetNodalOffset;
+			PassParameters->TargetViewToNDC = Parameters.TargetCamera.ViewToNDC;
 		}
 	);
 

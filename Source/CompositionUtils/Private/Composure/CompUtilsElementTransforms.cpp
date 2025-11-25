@@ -64,16 +64,13 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 	{
 		if (auto Interface = FindCameraInterfaceFromInputElement(SourceCamera.Get()))
 		{
-			FCompUtilsCameraIntrinsicData CameraIntrinsicData;
-			Interface->GetCameraIntrinsicData(CameraIntrinsicData);
-
-			Params.InvProjectionMatrix = CameraIntrinsicData.NDCToView;
+			Interface->GetCameraIntrinsicData(Params.SourceCamera);
 		}
 	}
 	else
 	{
 		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthProcessingPass: SourceCamera is missing or doesn't implement CompUtils CameraInterface!"));
-		Params.InvProjectionMatrix = FMatrix44f::Identity;
+		return Input;
 	}
 
 	Params.bEnableJacobiSteps = bEnableJacobi;

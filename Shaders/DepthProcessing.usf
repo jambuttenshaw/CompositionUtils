@@ -88,10 +88,12 @@ float4 JacobiStepPS(
 
 
 // Camera matrix of Stereolabs camera to project into view space - to compare against planes
-float4x4 InvCameraProjectionMatrix;
+float4x4 SourceNDCToView;
+
 // All depth values beyond this distance will be clipped
 int bEnableFarClipping;
 float FarClipDistance;
+
 // All depth values on the other side of this plane will be clipped
 int bEnableClippingPlane;
 float4 UserClippingPlane;
@@ -115,16 +117,17 @@ float4 DepthClipPS(
 	// All invalid depths from reconstruction have been processed - mark depth as VALID until found otherwise
 	D.w = 1.0f;
 
-	// Un-project into view-space
-	float2 NDCSpacePos = (InUV - 0.5f) * 2.0f * float2(1, -1);
+	// De-project pixel into view space
+	float4 NDC = float4(InUV * 2.0f - 1.0f, 0.0f, 1.0f);
+	NDC.y = -NDC.y; // UV space has y-axis flipped from NDC
 
-	float4 PosOnNearPlane = mul(float4(NDCSpacePos, 1, 1), InvCameraProjectionMatrix);
-	float3 DirToNearPlane = PosOnNearPlane.xyz / PosOnNearPlane.w;
+	float4 Deprojected = mul(NDC, SourceNDCToView);
 
-	float3 ViewSpacePos = DirToNearPlane * D.x;
+	float Depth = InTex.Sample(sampler0, InUV).r;
+	float4 ViewSpace = float4(Depth * Deprojected.xyz, 1.0f);
 
 	// Clip against user-defined clipping planes
-	D.w *= saturate(bEnableClippingPlane) * dot(ViewSpacePos.xyz, UserClippingPlane.xyz) - UserClippingPlane.w > 0;
+	D.w *= saturate(bEnableClippingPlane) * dot(ViewSpace.xyz, UserClippingPlane.xyz) - UserClippingPlane.w > 0;
 
 	// Clip against far plane
 	D.w *= saturate(bEnableFarClipping) * D.x < FarClipDistance;
