@@ -1,16 +1,44 @@
 #include "Composure/CompUtilsElementTransforms.h"
 
-#include "CompositionUtils.h"
 #include "RenderGraphBuilder.h"
 #include "RHIGPUReadback.h"
 #include "TextureResource.h"
 
-#include "CompositingElements/ICompositingTextureLookupTable.h"
-#include "Composure/CompUtilsCaptureBase.h"
-#include "Pipelines/CompUtilsPipelines.h"
-
 #include "Components/DirectionalLightComponent.h"
 
+#include "CompositingElements/ICompositingTextureLookupTable.h"
+#include "Composure/CompUtilsCaptureBase.h"
+
+#include "CompositionUtils.h"
+#include "CompUtilsCameraInterface.h"
+
+#include "Pipelines/CompUtilsPipelines.h"
+
+
+/////////////
+// Helpers //
+/////////////
+
+// Searches the compositing element to see if itself or any of its input passes implement the CompUtilsCameraInterface
+// Returns nullptr if no interface could be found
+ICompUtilsCameraInterface* FindCameraInterfaceFromInputElement(ACompositingElement* CompositingElement)
+{
+	if (CompositingElement->Implements<UCompUtilsCameraInterface>())
+	{
+		return Cast<ICompUtilsCameraInterface>(CompositingElement);
+	}
+
+	// Search inputs
+	for (auto Input : CompositingElement->GetInputsList())
+	{
+		if (Input->Implements<UCompUtilsCameraInterface>())
+		{
+			return Cast<ICompUtilsCameraInterface>(Input);
+		}
+	}
+
+	return nullptr;
+}
 
 //////////////////////////////////////////
 // UCompositionUtilsDepthProcessingPass //
@@ -32,18 +60,19 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 
 	FDepthProcessingParametersProxy Params;
 
-	if (!CameraInput.IsValid())
+	if (SourceCamera.IsValid())
 	{
-		CameraInput = UCompositionUtilsCameraInput::TryGetCameraInputPassFromCompositingElement(SourceCameraInputElement);
-	}
+		if (auto Interface = FindCameraInterfaceFromInputElement(SourceCamera.Get()))
+		{
+			FCompUtilsCameraIntrinsicData CameraIntrinsicData;
+			Interface->GetCameraIntrinsicData(CameraIntrinsicData);
 
-	FCompUtilsCameraIntrinsicData CameraIntrinsicData;
-	if (CameraInput.IsValid() && CameraInput->GetCameraIntrinsicData(CameraIntrinsicData))
-	{
-		Params.InvProjectionMatrix = CameraIntrinsicData.NDCToView;
+			Params.InvProjectionMatrix = CameraIntrinsicData.NDCToView;
+		}
 	}
 	else
 	{
+		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthProcessingPass: SourceCamera is missing or doesn't implement CompUtils CameraInterface!"));
 		Params.InvProjectionMatrix = FMatrix44f::Identity;
 	}
 
@@ -91,19 +120,6 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 	return RenderTarget;
 }
 
-#if WITH_EDITOR
-void UCompositionUtilsDepthProcessingPass::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
-{
-	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCompositionUtilsDepthProcessingPass, SourceCameraInputElement))
-	{
-		CameraInput = nullptr;
-	}
-
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-}
-#endif
-
 
 /////////////////////////////////////////
 // UCompositionUtilsDepthAlignmentPass //
@@ -118,7 +134,7 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 
 	if (!(SourceCamera.IsValid() && TargetCamera.IsValid()))
 	{
-		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: One of SourceCameraInputElement or TargetVirtualCameraActor has not been assigned."));
+		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: One of SourceCamera or TargetCamera has not been assigned."));
 		return Input;
 	}
 
@@ -141,7 +157,7 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 	}
 	else
 	{
-		UE_LOG(LogCompositionUtils, Warning, TEXT("CompositionUtilsDepthAlignmentPass is not set up correctly: Virtual Camera Target Actor is missing!"));
+		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: Virtual Camera Target Actor is missing!"));
 		return Input;
 	}
 
@@ -162,13 +178,16 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		SourceToTargetNodalOffset.SetFromMatrix(static_cast<FMatrix>(ExtrinsicMatrix));
 	}
 
-	if (!CameraInput.IsValid())
-		CameraInput = UCompositionUtilsCameraInput::TryGetCameraInputPassFromCompositingElement(SourceCamera);
-	if (CameraInput.IsValid() && CameraInput->GetCameraIntrinsicData(ParametersProxy.SourceCamera))
-	{}
+	if (SourceCamera.IsValid())
+	{
+		if (auto Interface = FindCameraInterfaceFromInputElement(SourceCamera.Get()))
+		{
+			Interface->GetCameraIntrinsicData(ParametersProxy.SourceCamera);
+		}
+	}
 	else
 	{
-		UE_LOG(LogCompositionUtils, Warning, TEXT("CompositionUtilsDepthAlignmentPass is not set up correctly: Source Camera Input Element is missing!"));
+		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: SourceCamera is missing or doesn't implement CompUtils CameraInterface!"));
 		return Input;
 	}
 
@@ -228,19 +247,6 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 
 	return RenderTarget;
 }
-
-#if WITH_EDITOR
-void UCompositionUtilsDepthAlignmentPass::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
-{
-	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCompositionUtilsDepthAlignmentPass, SourceCamera))
-	{
-		CameraInput = nullptr;
-	}
-
-	Super::PostEditChangeProperty(PropertyChangedEvent);
-}
-#endif
 
 /*
 void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGPUBufferReadback& Readback)

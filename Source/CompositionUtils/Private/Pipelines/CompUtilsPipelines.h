@@ -3,7 +3,7 @@
 #include "ScreenPass.h"
 #include <functional>
 
-#include "Composure/CompUtilsElementInput.h"
+#include "CompUtilsCameraData.h"
 
 
 struct FDepthProcessingParametersProxy

@@ -3,7 +3,6 @@
 #include "CoreMinimal.h"
 
 #include "CompositingElement.h"
-#include "CompUtilsElementInput.h"
 #include "CompositingElements/CompositingElementPasses.h"
 #include "Engine/DirectionalLight.h"
 
@@ -18,7 +17,6 @@ class COMPOSITIONUTILS_API UCompositionUtilsDepthProcessingPass : public UCompos
 	GENERATED_BODY()
 
 public:
-
 	// Reconstruction Parameters
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", InlineEditConditionToggle))
 	bool bEnableJacobi = false;
@@ -37,22 +35,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnableFloorClipping"))
 	float FloorClipDistance = 100.0f; // 100cm
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName"))
-	TWeakObjectPtr<ACompositingElement> SourceCameraInputElement;
+	UPROPERTY(EditAnywhere, Category = "Compositing Pass", meta = (DisplayAfter = "PassName"))
+	TWeakObjectPtr<ACompositingElement> SourceCamera;
 
 public:
 	//~ Begin UCompositingElementTransform interface
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
 	//~ End UCompositingElementTransform interface
-
-	//~ Begin UObject interface
-#if WITH_EDITOR
-	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
-#endif
-	//~ End UObject interface
-
-private:
-	TWeakObjectPtr<UCompositionUtilsCameraInput> CameraInput;
 };
 
 
@@ -69,7 +58,6 @@ class COMPOSITIONUTILS_API UCompositionUtilsDepthAlignmentPass : public UComposi
 	GENERATED_BODY()
 
 public:
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
 	TWeakObjectPtr<ACompositingElement> SourceCamera;
 
@@ -96,15 +84,6 @@ public:
 	//~ Begin UCompositingElementTransform interface
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
 	//~ End UCompositingElementTransform interface
-
-	//~ Begin UObject interface
-#if WITH_EDITOR
-	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
-#endif
-	//~ End UObject interface
-
-private:
-	TWeakObjectPtr<UCompositionUtilsCameraInput> CameraInput;
 };
 
 
@@ -190,7 +169,6 @@ class COMPOSITIONUTILS_API UCompositionUtilsDepthPreviewPass : public UCompositi
 	GENERATED_BODY()
 
 public:
-
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled", ClampMin="0"))
 	FVector2D VisualizeDepthRange = { 0, 1000 };
 
@@ -198,7 +176,6 @@ public:
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;
 
 private:
-
 	void ApplyVisualizeDepth(UTexture* Input, UTextureRenderTarget2D* RenderTarget) const;
 };
 
@@ -214,8 +191,6 @@ class COMPOSITIONUTILS_API UCompositionUtilsNormalMapPreviewPass : public UCompo
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
 	bool bDisplayWorldSpaceNormals = true;
-
-public:
 
 public:
 	virtual UTexture* ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera) override;

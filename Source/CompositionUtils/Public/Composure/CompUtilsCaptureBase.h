@@ -1,7 +1,6 @@
 #pragma once
 
 #include "CompositingCaptureBase.h"
-#include "CompUtilsElementInput.h"
 
 #include "CompUtilsCaptureBase.generated.h"
 
@@ -71,9 +70,6 @@ public:
 	const FVolumetricFogRequiredDataProxy* GetVolumetricFogData() const;
 protected:
 	FVolumetricFogRequiredDataProxy* GetVolumetricFogData();
-
-private:
-	TWeakObjectPtr<UCompositionUtilsCameraInput> AuxiliaryCameraInput;
 
 public:
 	// Call this in GenerateInputs before rendering the scene capture
