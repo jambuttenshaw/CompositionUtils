@@ -31,14 +31,17 @@ struct FDepthAlignmentParametersProxy
 	FMatrix44f SourceToTargetNodalOffset;
 
 	uint32 HoleFillingBias = 0;
+};
 
-	//  -- Calibration only -- 
+struct FDepthCalibrationParametersProxy
+{
+	FCompUtilsCameraIntrinsicData SourceCamera;
+
 	uint32 CalibrationPointCount = 64;
 	FVector4f CalibrationRulers{ 0.0f, 0.0f, 1.0f, 1.0f };
 
 	// Calibration Visualization
 	bool bShowPoints = true;
-	// -- End Calibration only --
 };
 
 // Resources and parameters extracted from the scene render graph to be able to apply volumetric fog in composure
@@ -129,9 +132,10 @@ namespace CompositionUtils
 		FRDGTextureRef OutTexture
 	);
 
+
 	void ExecuteDepthAlignmentCalibrationPipeline(
 		FRDGBuilder& GraphBuilder,
-		const FDepthAlignmentParametersProxy& Parameters,
+		const FDepthCalibrationParametersProxy& Parameters,
 		FRDGTextureRef InTexture,
 		FRDGTextureRef OutTexture,
 		FRHIGPUBufferReadback& CalibrationPointReadback
@@ -139,7 +143,7 @@ namespace CompositionUtils
 
 	void VisualizeDepthAlignmentCalibrationPoints(
 		FRDGBuilder& GraphBuilder,
-		const FDepthAlignmentParametersProxy& Parameters,
+		const FDepthCalibrationParametersProxy& Parameters,
 		FRDGTextureRef InTexture,
 		FRDGTextureRef OutTexture
 	);

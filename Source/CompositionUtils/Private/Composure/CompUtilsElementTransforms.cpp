@@ -34,7 +34,7 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 
 	if (!CameraInput.IsValid())
 	{
-		CameraInput = UCompositionUtilsCameraInput::TryGetCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
+		CameraInput = UCompositionUtilsCameraInput::TryGetCameraInputPassFromCompositingElement(SourceCameraInputElement);
 	}
 
 	FCompUtilsCameraIntrinsicData CameraIntrinsicData;
@@ -95,7 +95,7 @@ UTexture* UCompositionUtilsDepthProcessingPass::ApplyTransform_Implementation(UT
 void UCompositionUtilsDepthProcessingPass::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
 {
 	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCompositionUtilsDepthProcessingPass, AuxiliaryCameraInputElement))
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCompositionUtilsDepthProcessingPass, SourceCameraInputElement))
 	{
 		CameraInput = nullptr;
 	}
@@ -110,15 +110,15 @@ void UCompositionUtilsDepthProcessingPass::PostEditChangeProperty(struct FProper
 /////////////////////////////////////////
 
 
-UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
+UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor*)
 {
 	if (!Input)
 		return Input;
 	check(Input->GetResource());
 
-	if (!(AuxiliaryCameraInputElement.IsValid() && VirtualCameraTargetActor.IsValid()))
+	if (!(SourceCamera.IsValid() && TargetCamera.IsValid()))
 	{
-		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: One of AuxiliaryCameraInputElement or VirtualCameraTargetActor has not been assigned."));
+		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: One of SourceCameraInputElement or TargetVirtualCameraActor has not been assigned."));
 		return Input;
 	}
 
@@ -126,10 +126,10 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 	// If any fails then this will pass through with a warning
 	FDepthAlignmentParametersProxy ParametersProxy;
 
-	if (VirtualCameraTargetActor.IsValid())
+	if (TargetCamera.IsValid())
 	{
 		FMinimalViewInfo VirtualCameraView;
-		VirtualCameraTargetActor->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
+		TargetCamera->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
 
 		FMatrix ProjectionMatrix = VirtualCameraView.CalculateProjectionMatrix();
 		ParametersProxy.TargetCamera.ViewToNDC = static_cast<FMatrix44f>(ProjectionMatrix);
@@ -147,19 +147,11 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 
 	// Update nodal offset transform
 	{
-		if (bResetCalibration)
-		{
-			bResetCalibration = false;
-			CalibratedRotation = FQuat4f::Identity;
-			CalibratedTranslation = FVector3f::ZeroVector;
-		}
-
 		FMatrix44f ExtrinsicMatrix = FMatrix44f::Identity;
 
 		FQuat4f AlignTangentRotation{ FVector3f{ 0, 0, -1 }, FMath::DegreesToRadians(AlignmentRotationOffset) };
-		FQuat4f Rotation = AlignTangentRotation * CalibratedRotation;
-
-		FVector3f Translation = CalibratedTranslation + FVector3f(AlignmentTranslationOffset.X, AlignmentTranslationOffset.Y, 0);
+		FQuat4f Rotation = AlignTangentRotation;
+		FVector3f Translation = FVector3f(AlignmentTranslationOffset.X, AlignmentTranslationOffset.Y, 0);
 
 		ExtrinsicMatrix = ExtrinsicMatrix.ConcatTranslation(Translation);
 		ExtrinsicMatrix *= Rotation.ToMatrix();
@@ -167,32 +159,20 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		ParametersProxy.SourceToTargetNodalOffset = ExtrinsicMatrix;
 
 		// This is so users can see what data is in the nodal offset matrix for debugging
-		AuxiliaryToPrimaryNodalOffset.SetFromMatrix(static_cast<FMatrix>(ExtrinsicMatrix));
+		SourceToTargetNodalOffset.SetFromMatrix(static_cast<FMatrix>(ExtrinsicMatrix));
 	}
 
 	if (!CameraInput.IsValid())
-		CameraInput = UCompositionUtilsCameraInput::TryGetCameraInputPassFromCompositingElement(AuxiliaryCameraInputElement);
+		CameraInput = UCompositionUtilsCameraInput::TryGetCameraInputPassFromCompositingElement(SourceCamera);
 	if (CameraInput.IsValid() && CameraInput->GetCameraIntrinsicData(ParametersProxy.SourceCamera))
 	{}
 	else
 	{
-		UE_LOG(LogCompositionUtils, Warning, TEXT("CompositionUtilsDepthAlignmentPass is not set up correctly: Auxiliary Camera Input Element is missing!"));
+		UE_LOG(LogCompositionUtils, Warning, TEXT("CompositionUtilsDepthAlignmentPass is not set up correctly: Source Camera Input Element is missing!"));
 		return Input;
 	}
 
 	ParametersProxy.HoleFillingBias = static_cast<uint32>(HoleFillingBias);
-
-	// Calibration parameters
-	{
-		if (!InterestPointSpawnMin.ComponentwiseAllLessThan(InterestPointSpawnMax))
-		{
-			UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentCalibration: Degenerate point spawning rulers! Max must be greater than min."))
-			return Input;
-		}
-		ParametersProxy.CalibrationRulers = FVector4f{ InterestPointSpawnMin, InterestPointSpawnMax };
-		ParametersProxy.CalibrationPointCount = static_cast<uint32>(CalibrationPointCount);
-		ParametersProxy.bShowPoints = bShowCalibrationPoints;
-	}
 
 	FIntPoint Dims;
 	Dims.X = Input->GetResource()->GetSizeX();
@@ -203,8 +183,7 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		return Input;
 
 	ENQUEUE_RENDER_COMMAND(ApplyDepthAlignmentPass)(
-		[this, bRunCalibration = bRunCalibrationOnNextPass,
-				Parameters = ParametersProxy, InputResource = Input->GetResource(), OutputResource = RenderTarget->GetResource()]
+		[this, Parameters = ParametersProxy, InputResource = Input->GetResource(), OutputResource = RenderTarget->GetResource()]
 		(FRHICommandListImmediate& RHICmdList)
 		{
 			FRDGBuilder GraphBuilder(RHICmdList);
@@ -218,35 +197,15 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 			FRDGTextureRef OutColorTexture = GraphBuilder.RegisterExternalTexture(OutputRT);
 
 			// Execute pipeline
-			if (bRunCalibration)
-			{
-				CompositionUtils::ExecuteDepthAlignmentCalibrationPipeline(
-					GraphBuilder,
-					Parameters,
-					InColorTexture,
-					OutColorTexture,
-					CalibrationPointReadback);
-			}
-
-			if (Parameters.bShowPoints)
-			{
-				CompositionUtils::VisualizeDepthAlignmentCalibrationPoints(
-					GraphBuilder,
-					Parameters,
-					InColorTexture,
-					OutColorTexture);
-			}
-			else
-			{
-				CompositionUtils::ExecuteDepthAlignmentPipeline(
-					GraphBuilder,
-					Parameters,
-					InColorTexture,
-					OutColorTexture);
-			}
-
+			CompositionUtils::ExecuteDepthAlignmentPipeline(
+				GraphBuilder,
+				Parameters,
+				InColorTexture,
+				OutColorTexture);
+			
 			GraphBuilder.Execute();
 
+			/*
 			if (bRunCalibration)
 			{
 				TFuture<void> Task = Async(EAsyncExecution::TaskGraph, [this, CalibrationPointReadbackTemp = std::move(CalibrationPointReadback)]
@@ -264,10 +223,8 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 							});
 					});
 			}
+			*/
 		});
-
-	// Reset calibration flag - don't want to execute calibration on successive frames
-	bRunCalibrationOnNextPass = false;
 
 	return RenderTarget;
 }
@@ -276,7 +233,7 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 void UCompositionUtilsDepthAlignmentPass::PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent)
 {
 	const FName PropertyName = PropertyChangedEvent.GetPropertyName();
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCompositionUtilsDepthAlignmentPass, AuxiliaryCameraInputElement))
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UCompositionUtilsDepthAlignmentPass, SourceCamera))
 	{
 		CameraInput = nullptr;
 	}
@@ -285,6 +242,7 @@ void UCompositionUtilsDepthAlignmentPass::PostEditChangeProperty(struct FPropert
 }
 #endif
 
+/*
 void UCompositionUtilsDepthAlignmentPass::CalibrateAlignment_RenderThread(FRHIGPUBufferReadback& Readback)
 {
 	// Read back calibration points and perform calibration
@@ -359,7 +317,7 @@ void UCompositionUtilsDepthAlignmentPass::UpdateCalibration_GameThread(const FVe
 	CalibratedTranslation = Translation;
 	CalibratedRotation = Rotation;
 }
-
+*/
 
 //////////////////////////////////////
 // UCompositionUtilsVolumetricsPass //

@@ -38,7 +38,7 @@ public:
 	float FloorClipDistance = 100.0f; // 100cm
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName"))
-	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;
+	TWeakObjectPtr<ACompositingElement> SourceCameraInputElement;
 
 public:
 	//~ Begin UCompositingElementTransform interface
@@ -57,7 +57,11 @@ private:
 
 
 /**
- * Aligns the depth image (input to this pass) as if it had been taken from the POV of a different camera, specified by the Virtual Camera Target Actor
+ * Aligns the depth image (input to this pass) as if it had been taken from the POV of a different camera
+ * It needs to know the camera that the depth image came from (SourceCamera)
+ * and the camera that it should be aligned to (TargetCamera)
+ *
+ * This relies on known the intrinsic properties of each camera, and the extrinsic nodal offset relating the two cameras.
  */
 UCLASS(BlueprintType, Blueprintable)
 class COMPOSITIONUTILS_API UCompositionUtilsDepthAlignmentPass : public UCompositingElementTransform
@@ -67,15 +71,17 @@ class COMPOSITIONUTILS_API UCompositionUtilsDepthAlignmentPass : public UComposi
 public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	TWeakObjectPtr<ACompositingElement> AuxiliaryCameraInputElement;
+	TWeakObjectPtr<ACompositingElement> SourceCamera;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	TWeakObjectPtr<ACameraActor> VirtualCameraTargetActor;
+	TWeakObjectPtr<ACameraActor> TargetCamera;
 
+private:
+	// Debug purposes only - to be able to see what values are in the matrix
+	UPROPERTY(VisibleAnywhere, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
+	FTransform SourceToTargetNodalOffset;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	FTransform AuxiliaryToPrimaryNodalOffset;
-
+public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
 	FVector2D AlignmentTranslationOffset;
 
@@ -85,37 +91,6 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled", ClampMin="0", ClampMax="8"))
 	int32 HoleFillingBias = 0;
-
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
-	bool bShowCalibrationPoints = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
-	bool bRunCalibrationOnNextPass = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
-	bool bResetCalibration = false;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled&&bShowCalibrationPoints"))
-	int32 CalibrationPointCount = 32;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", 
-				meta = (EditCondition = "bEnabled&&bShowCalibrationPoints", ClampMin = "0", ClampMax = "1"))
-	FVector2f InterestPointSpawnMin{ 0.0f };
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", 
-				meta = (EditCondition = "bEnabled&&bShowCalibrationPoints", ClampMin = "0", ClampMax = "1"))
-	FVector2f InterestPointSpawnMax{ 1.0f };
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Calibration", meta = (EditCondition = "bEnabled"))
-	float KnownDistance = 200.0f;
-
-private:
-
-	// Intermediate calibrated transform - before manual adjustments are applied.
-	// The final transform is re-calculated before the transform pass is applied
-	FVector3f CalibratedTranslation = FVector3f::ZeroVector;
-	FQuat4f CalibratedRotation = FQuat4f::Identity;
 
 public:
 	//~ Begin UCompositingElementTransform interface
@@ -127,11 +102,6 @@ public:
 	virtual void PostEditChangeProperty(struct FPropertyChangedEvent& PropertyChangedEvent) override;
 #endif
 	//~ End UObject interface
-
-private:
-	// Reads data back from GPU to perform calibration
-	void CalibrateAlignment_RenderThread(FRHIGPUBufferReadback& Readback);
-	void UpdateCalibration_GameThread(const FVector3f& Translation, const FQuat4f& Rotation);
 
 private:
 	TWeakObjectPtr<UCompositionUtilsCameraInput> CameraInput;
