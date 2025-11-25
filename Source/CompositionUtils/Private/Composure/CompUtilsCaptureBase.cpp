@@ -53,3 +53,25 @@ const FCameraTexturesProxy& ACompositionUtilsCaptureBase::GetCameraTextures_Rend
 	check(IsInRenderingThread());
 	return CameraTextures_RenderThread;
 }
+
+bool ACompositionUtilsCaptureBase::GetCameraIntrinsicData(FCompUtilsCameraIntrinsicData& OutData)
+{
+	ACameraActor* CameraActor = FindTargetCamera();
+	if (!CameraActor)
+	{
+		return false;
+	}
+
+	FMinimalViewInfo VirtualCameraView;
+	CameraActor->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
+
+	FMatrix ProjectionMatrix = VirtualCameraView.CalculateProjectionMatrix();
+	OutData.ViewToNDC = static_cast<FMatrix44f>(ProjectionMatrix);
+	OutData.NDCToView = static_cast<FMatrix44f>(ProjectionMatrix.Inverse());
+	OutData.HorizontalFOV = FMath::DegreesToRadians(VirtualCameraView.FOV);
+	// Calculate vertical FOV from horizontal FOV
+	OutData.VerticalFOV =
+		2.0f * FMath::Atan(FMath::Tan(0.5f * OutData.HorizontalFOV) / VirtualCameraView.AspectRatio);
+
+	return true;
+}

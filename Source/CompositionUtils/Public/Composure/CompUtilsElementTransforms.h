@@ -62,7 +62,7 @@ public:
 	TWeakObjectPtr<ACompositingElement> SourceCamera;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	TWeakObjectPtr<ACameraActor> TargetCamera;
+	TWeakObjectPtr<ACompositingElement> TargetCamera;
 
 private:
 	// Debug purposes only - to be able to see what values are in the matrix

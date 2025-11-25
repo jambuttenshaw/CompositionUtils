@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CompositingCaptureBase.h"
+#include "CompUtilsCameraInterface.h"
 
 #include "CompUtilsCaptureBase.generated.h"
 
@@ -19,7 +20,7 @@ struct FCameraTexturesProxy
  *	Base class for CG Compositing elements that will work with depth cameras
  */
 UCLASS(BlueprintType)
-class COMPOSITIONUTILS_API ACompositionUtilsCaptureBase : public ACompositingCaptureBase
+class COMPOSITIONUTILS_API ACompositionUtilsCaptureBase : public ACompositingCaptureBase, public ICompUtilsCameraInterface
 {
 	GENERATED_BODY()
 
@@ -77,6 +78,11 @@ public:
 	void FetchLatestCameraTextures_GameThread();
 
 	const FCameraTexturesProxy& GetCameraTextures_RenderThread() const;
+
+public:
+	//~ Begin ICompUtilsCameraInterface interface
+	virtual bool GetCameraIntrinsicData(FCompUtilsCameraIntrinsicData& OutData) override;
+	//~ End ICompUtilsCameraInterface interface
 
 protected:
 	// Rendering resources extracted from the scene renderer for use in composition

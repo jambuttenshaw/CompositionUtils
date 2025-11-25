@@ -142,22 +142,29 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 	// If any fails then this will pass through with a warning
 	FDepthAlignmentParametersProxy ParametersProxy;
 
-	if (TargetCamera.IsValid())
+	if (SourceCamera.IsValid())
 	{
-		FMinimalViewInfo VirtualCameraView;
-		TargetCamera->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
-
-		FMatrix ProjectionMatrix = VirtualCameraView.CalculateProjectionMatrix();
-		ParametersProxy.TargetCamera.ViewToNDC = static_cast<FMatrix44f>(ProjectionMatrix);
-		ParametersProxy.TargetCamera.NDCToView = static_cast<FMatrix44f>(ProjectionMatrix.Inverse());
-		ParametersProxy.TargetCamera.HorizontalFOV = FMath::DegreesToRadians(VirtualCameraView.FOV);
-		// Calculate vertical FOV from horizontal FOV
-		ParametersProxy.TargetCamera.VerticalFOV = 
-			2.0f * FMath::Atan(FMath::Tan(0.5f * ParametersProxy.TargetCamera.HorizontalFOV) / VirtualCameraView.AspectRatio);
+		if (auto Interface = FindCameraInterfaceFromInputElement(SourceCamera.Get()))
+		{
+			Interface->GetCameraIntrinsicData(ParametersProxy.SourceCamera);
+		}
 	}
 	else
 	{
-		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: Virtual Camera Target Actor is missing!"));
+		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: SourceCamera is missing or doesn't implement CompUtils CameraInterface!"));
+		return Input;
+	}
+
+	if (TargetCamera.IsValid())
+	{
+		if (auto Interface = FindCameraInterfaceFromInputElement(TargetCamera.Get()))
+		{
+			Interface->GetCameraIntrinsicData(ParametersProxy.TargetCamera);
+		}
+	}
+	else
+	{
+		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: TargetCamera is missing or doesn't implement CompUtils CameraInterface!"));
 		return Input;
 	}
 
@@ -176,19 +183,6 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 
 		// This is so users can see what data is in the nodal offset matrix for debugging
 		SourceToTargetNodalOffset.SetFromMatrix(static_cast<FMatrix>(ExtrinsicMatrix));
-	}
-
-	if (SourceCamera.IsValid())
-	{
-		if (auto Interface = FindCameraInterfaceFromInputElement(SourceCamera.Get()))
-		{
-			Interface->GetCameraIntrinsicData(ParametersProxy.SourceCamera);
-		}
-	}
-	else
-	{
-		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: SourceCamera is missing or doesn't implement CompUtils CameraInterface!"));
-		return Input;
 	}
 
 	ParametersProxy.HoleFillingBias = static_cast<uint32>(HoleFillingBias);
