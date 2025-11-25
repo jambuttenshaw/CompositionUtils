@@ -618,7 +618,7 @@ UTexture* UCompositionUtilsTextureMappingPass::ApplyTransform_Implementation(UTe
 	UTexture* AlignedDepth = nullptr;
 	bool bSuccess = PrePassLookupTable->FindNamedPassResult(AlignedDepthPassName, AlignedDepth);
 
-	if (!bSuccess)
+	if (!bSuccess || !AlignedDepth)
 		return Input;
 
 	ENQUEUE_RENDER_COMMAND(ApplyRelightingPass)(
@@ -648,4 +648,22 @@ UTexture* UCompositionUtilsTextureMappingPass::ApplyTransform_Implementation(UTe
 		});
 
 	return RenderTarget;
+}
+
+
+///////////////////////////////////////
+// UCompositionUtilsImageComparePass //
+///////////////////////////////////////
+
+UTexture* UCompositionUtilsCompareTexturesPass::ApplyTransform_Implementation(UTexture* Input, UComposurePostProcessingPassProxy* PostProcessProxy, ACameraActor* TargetCamera)
+{
+	UTexture* TextureA = nullptr;
+	UTexture* TextureB = nullptr;
+	bool bSuccess = PrePassLookupTable->FindNamedPassResult(TextureAPassName, TextureA);
+	bSuccess	 |= PrePassLookupTable->FindNamedPassResult(TextureBPassName, TextureB);
+
+	if (!bSuccess)
+		return Input;
+
+	return bShowA ? TextureA : TextureB;
 }
