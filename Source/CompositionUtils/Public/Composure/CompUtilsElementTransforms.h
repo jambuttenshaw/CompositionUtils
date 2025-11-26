@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 
 #include "CompositingElement.h"
-#include "ReprojectionCalibrationData.h"
+#include "ReprojectionCalibration.h"
 #include "CompositingElements/CompositingElementPasses.h"
 #include "Engine/DirectionalLight.h"
 
@@ -64,7 +64,7 @@ public:
 	TWeakObjectPtr<ACompositingElement> TargetCamera;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	TSoftObjectPtr<UReprojectionCalibrationData> CalibrationData;
+	TSoftObjectPtr<UReprojectionCalibration> CalibrationData;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled", ClampMin="0", ClampMax="8"))
 	int32 HoleFillingBias = 0;
