@@ -1,5 +1,6 @@
 #include "ReprojectionCalibrationActions.h"
 #include "ReprojectionCalibration.h"
+#include "ReprojectionCalibrationEditorToolkit.h"
 
 UClass* FReprojectionCalibrationActions::GetSupportedClass() const
 {
@@ -19,4 +20,9 @@ FColor FReprojectionCalibrationActions::GetTypeColor() const
 uint32 FReprojectionCalibrationActions::GetCategories()
 {
 	return EAssetTypeCategories::Misc;
+}
+
+void FReprojectionCalibrationActions::OpenAssetEditor(const TArray<UObject*>& InObjects, TSharedPtr<IToolkitHost> EditWithinLevelEditor)
+{
+	MakeShared<FReprojectionCalibrationEditorToolkit>()->InitEditor(InObjects);
 }
