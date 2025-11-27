@@ -5,8 +5,8 @@ SCREEN_PASS_TEXTURE_VIEWPORT(OutViewPort)
 SCREEN_PASS_TEXTURE_VIEWPORT(InViewPort)
 
 float4x4 SourceNDCToView;
-float4x4 SourceToTargetNodalOffset;
-float4x4 TargetViewToNDC;
+float4x4 SourceToDestinationNodalOffset;
+float4x4 DestinationViewToNDC;
 
 Texture2D InTex;
 SamplerState sampler0; // Bilinear sampler to perform interpolation
@@ -25,10 +25,10 @@ float2 CalculateUVMapPS(
 	float4 ViewSpace = float4(Depth * Deprojected.xyz, 1.0f);
 
 	// Apply nodal offest matrix
-	ViewSpace = mul(ViewSpace, SourceToTargetNodalOffset);
+	ViewSpace = mul(ViewSpace, SourceToDestinationNodalOffset);
 
 	// Re-project back into screen space
-	NDC = mul(ViewSpace, TargetViewToNDC);
+	NDC = mul(ViewSpace, DestinationViewToNDC);
 	NDC /= NDC.w;
 
 	float2 OutUV = NDC.xy * 0.5f + 0.5f;
