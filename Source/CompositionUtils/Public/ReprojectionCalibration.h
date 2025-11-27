@@ -17,4 +17,10 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FTransform ExtrinsicTransform;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<AActor> Source;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	TObjectPtr<AActor> Target;
 };
