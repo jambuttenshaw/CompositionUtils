@@ -25,10 +25,10 @@ struct FDepthProcessingParametersProxy
 struct FDepthAlignmentParametersProxy
 {
 	FCompUtilsCameraIntrinsicData SourceCamera;
-	FCompUtilsCameraIntrinsicData TargetCamera;
+	FCompUtilsCameraIntrinsicData DestinationCamera;
 
 	// Extrinsic properties
-	FMatrix44f SourceToTargetNodalOffset;
+	FMatrix44f SourceToDestinationNodalOffset;
 
 	uint32 HoleFillingBias = 0;
 };

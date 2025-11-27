@@ -6,7 +6,7 @@
 #include "ReprojectionCalibration.generated.h"
 
 /**
- * Composition Utils: Contains calibrated data to enable reprojection from a source camera to a target camera
+ * Composition Utils: Contains calibrated data to enable reprojection from a source camera to a destination camera
  */
 UCLASS()
 class COMPOSITIONUTILS_API UReprojectionCalibration : public UDataAsset
@@ -19,8 +19,9 @@ public:
 	FTransform ExtrinsicTransform;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<AActor> Source;
+	TObjectPtr<UObject> Source;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-	TObjectPtr<AActor> Target;
+
+	TObjectPtr<UObject> Destination;
 };

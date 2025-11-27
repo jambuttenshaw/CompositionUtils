@@ -16,8 +16,8 @@ class FCalculateUVMapPS : public FGlobalShader
 		SHADER_PARAMETER_RDG_TEXTURE_SRV(Texture2D<float4>, InTex)
 
 		SHADER_PARAMETER(FMatrix44f, SourceNDCToView)
-		SHADER_PARAMETER(FMatrix44f, SourceToTargetNodalOffset)
-		SHADER_PARAMETER(FMatrix44f, TargetViewToNDC)
+		SHADER_PARAMETER(FMatrix44f, SourceToDestinationNodalOffset)
+		SHADER_PARAMETER(FMatrix44f, DestinationViewToNDC)
 
 		RENDER_TARGET_BINDING_SLOTS()
 	END_SHADER_PARAMETER_STRUCT()
@@ -141,8 +141,8 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 			PassParameters->InTex = GraphBuilder.CreateSRV(InTexture);
 
 			PassParameters->SourceNDCToView = Parameters.SourceCamera.NDCToView;
-			PassParameters->SourceToTargetNodalOffset = Parameters.SourceToTargetNodalOffset;
-			PassParameters->TargetViewToNDC = Parameters.TargetCamera.ViewToNDC;
+			PassParameters->SourceToDestinationNodalOffset = Parameters.SourceToDestinationNodalOffset;
+			PassParameters->DestinationViewToNDC = Parameters.DestinationCamera.ViewToNDC;
 		}
 	);
 
@@ -178,8 +178,8 @@ void CompositionUtils::ExecuteDepthAlignmentPipeline(
 		{
 			float Physical_TanHalfFOVX = FMath::Tan(0.5f * Parameters.SourceCamera.HorizontalFOV);
 			float Physical_TanHalfFOVY = FMath::Tan(0.5f * Parameters.SourceCamera.VerticalFOV);
-			float Virtual_TanHalfFOVX  = FMath::Tan(0.5f * Parameters.TargetCamera.HorizontalFOV);
-			float Virtual_TanHalfFOVY  = FMath::Tan(0.5f * Parameters.TargetCamera.VerticalFOV);
+			float Virtual_TanHalfFOVX  = FMath::Tan(0.5f * Parameters.DestinationCamera.HorizontalFOV);
+			float Virtual_TanHalfFOVY  = FMath::Tan(0.5f * Parameters.DestinationCamera.VerticalFOV);
 			FIntPoint PatchSize = {
 				FMath::CeilToInt(Physical_TanHalfFOVX / Virtual_TanHalfFOVX),
 				FMath::CeilToInt(Physical_TanHalfFOVY / Virtual_TanHalfFOVY)

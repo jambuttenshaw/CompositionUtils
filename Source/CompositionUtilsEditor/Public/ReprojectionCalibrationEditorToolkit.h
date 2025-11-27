@@ -5,6 +5,8 @@
 #include "Toolkits/AssetEditorToolkit.h"
 
 
+class SReprojectionCalibrationViewWidget;
+
 class FReprojectionCalibrationEditorToolkit : public FAssetEditorToolkit
 {
 public:
@@ -19,6 +21,19 @@ public:
 	virtual FLinearColor GetWorldCentricTabColorScale() const override { return {}; }
 
 private:
+	TSharedRef<SDockTab> HandleTabSpawnerSpawnViewport(const FSpawnTabArgs& Args) const;
+	TSharedRef<SDockTab> HandleTabSpawnerSpawnDetails(const FSpawnTabArgs& Args) const;
+
+	TObjectPtr<UObject> GetSource() const;
+	TObjectPtr<UObject> GetDestination() const;
+
+	void OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const;
+
+private:
 	UReprojectionCalibration* ReprojectionCalibrationAsset = nullptr;
 
+	static const FName ViewportTabId;
+	static const FName DetailsTabId;
+
+	TSharedPtr<SReprojectionCalibrationViewWidget> ReprojectionCalibrationViewport;
 };

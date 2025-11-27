@@ -129,9 +129,9 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		return Input;
 	check(Input->GetResource());
 
-	if (!(SourceCamera.IsValid() && TargetCamera.IsValid()))
+	if (!(SourceCamera.IsValid() && DestinationCamera.IsValid()))
 	{
-		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: One of SourceCamera or TargetCamera has not been assigned."));
+		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: One of SourceCamera or DestinationCamera has not been assigned."));
 		return Input;
 	}
 
@@ -152,27 +152,27 @@ UTexture* UCompositionUtilsDepthAlignmentPass::ApplyTransform_Implementation(UTe
 		return Input;
 	}
 
-	if (TargetCamera.IsValid())
+	if (DestinationCamera.IsValid())
 	{
-		if (auto Interface = FindCameraInterfaceFromInputElement(TargetCamera.Get()))
+		if (auto Interface = FindCameraInterfaceFromInputElement(DestinationCamera.Get()))
 		{
-			Interface->GetCameraIntrinsicData(ParametersProxy.TargetCamera);
+			Interface->GetCameraIntrinsicData(ParametersProxy.DestinationCamera);
 		}
 	}
 	else
 	{
-		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: TargetCamera is missing or doesn't implement CompUtils CameraInterface!"));
+		UE_LOG(LogCompositionUtils, Warning, TEXT("DepthAlignmentPass: DestinationCamera is missing or doesn't implement CompUtils CameraInterface!"));
 		return Input;
 	}
 
 	// Update nodal offset transform
 	if (!CalibrationData.IsNull() && CalibrationData.LoadSynchronous())
 	{
-		ParametersProxy.SourceToTargetNodalOffset = static_cast<FMatrix44f>(CalibrationData->ExtrinsicTransform.ToMatrixNoScale());
+		ParametersProxy.SourceToDestinationNodalOffset = static_cast<FMatrix44f>(CalibrationData->ExtrinsicTransform.ToMatrixNoScale());
 	}
 	else
 	{
-		ParametersProxy.SourceToTargetNodalOffset = FMatrix44f::Identity;
+		ParametersProxy.SourceToDestinationNodalOffset = FMatrix44f::Identity;
 	}
 
 	ParametersProxy.HoleFillingBias = static_cast<uint32>(HoleFillingBias);

@@ -47,7 +47,7 @@ public:
 /**
  * Aligns the depth image (input to this pass) as if it had been taken from the POV of a different camera
  * It needs to know the camera that the depth image came from (SourceCamera)
- * and the camera that it should be aligned to (TargetCamera)
+ * and the camera that it should be aligned to (DestinationCamera)
  *
  * This relies on known the intrinsic properties of each camera, and the extrinsic nodal offset relating the two cameras.
  */
@@ -61,7 +61,7 @@ public:
 	TWeakObjectPtr<ACompositingElement> SourceCamera;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
-	TWeakObjectPtr<ACompositingElement> TargetCamera;
+	TWeakObjectPtr<ACompositingElement> DestinationCamera;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Compositing Pass|Setup", meta = (DisplayAfter = "PassName", EditCondition = "bEnabled"))
 	TSoftObjectPtr<UReprojectionCalibration> CalibrationData;
