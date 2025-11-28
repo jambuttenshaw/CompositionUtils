@@ -17,8 +17,6 @@ public:
 
 	// Interface that allows derived classes to provide their own targets
 	virtual TObjectPtr<UTexture> GetTexture() { return nullptr; }
-	// Returns true if texture has changed
-	virtual bool TickTexture() { return false; }
 };
 
 

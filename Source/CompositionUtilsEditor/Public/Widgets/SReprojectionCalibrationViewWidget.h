@@ -11,14 +11,9 @@ public:
 		{}
 		SLATE_ATTRIBUTE(TObjectPtr<UTexture>, SourceTexture)
 		SLATE_ATTRIBUTE(TObjectPtr<UTexture>, DestinationTexture)
-
-		SLATE_EVENT(FTickTargetTexture, TickSourceTexture)
-		SLATE_EVENT(FTickTargetTexture, TickDestinationTexture)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
-
-	virtual void Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime) override;
 
 	void InvalidateBrushes();
 
@@ -36,9 +31,6 @@ private:
 
 	TAttribute<TObjectPtr<UTexture>> SourceTexture;
 	TAttribute<TObjectPtr<UTexture>> DestinationTexture;
-
-	FTickTargetTexture TickSourceTexture;
-	FTickTargetTexture TickDestinationTexture;
 
 	TSharedPtr<FSlateImageBrush> SourceBrush;
 	TSharedPtr<FSlateImageBrush> DestinationBrush;

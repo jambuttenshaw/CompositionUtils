@@ -1,4 +1,4 @@
-#include "SReprojectionCalibrationViewWidget.h"
+#include "Widgets/SReprojectionCalibrationViewWidget.h"
 
 #include "Widgets/Layout/SScaleBox.h"
 
@@ -7,9 +7,6 @@ void SReprojectionCalibrationViewWidget::Construct(const FArguments& InArgs)
 {
 	SourceTexture = InArgs._SourceTexture;
 	DestinationTexture = InArgs._DestinationTexture;
-
-	TickSourceTexture = InArgs._TickSourceTexture;
-	TickDestinationTexture = InArgs._TickDestinationTexture;
 
 	FallbackBrush = FCoreStyle::Get().GetBrush("Checkerboard");
 
@@ -54,14 +51,6 @@ void SReprojectionCalibrationViewWidget::Construct(const FArguments& InArgs)
 					]
 			]
 	];
-}
-
-void SReprojectionCalibrationViewWidget::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
-{
-	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
-
-	TickSourceTexture.ExecuteIfBound();
-	TickDestinationTexture.ExecuteIfBound();
 }
 
 void SReprojectionCalibrationViewWidget::InvalidateBrushes()
