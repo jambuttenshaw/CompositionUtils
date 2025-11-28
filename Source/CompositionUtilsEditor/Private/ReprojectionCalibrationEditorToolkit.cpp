@@ -108,8 +108,26 @@ TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetDestination() con
 void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const
 {
 	FName PropertyName = Event.GetPropertyName();
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, Source)
-	 || PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, Destination))
+
+	bool bTargetChanged = false;
+	bTargetChanged |= PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, Source)
+				   || PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, Destination);
+
+	// Check if inner members of Source or Destination were changed
+	if (ReprojectionCalibrationAsset && !bTargetChanged)
+	{
+		// Don't know type of abstract objects Source and Destination so cannot directly check members
+		// Invalidate brushes if any member variables of source or destination were changed is conservative
+		int32 NumObjectsEdited = Event.GetNumObjectsBeingEdited();
+		for (int32 Index = 0; Index < NumObjectsEdited; Index++)
+		{
+			const UObject* EditedObject = Event.GetObjectBeingEdited(Index);
+			bTargetChanged |= EditedObject == static_cast<const UObject*>(ReprojectionCalibrationAsset->Source)
+						   || EditedObject == static_cast<const UObject*>(ReprojectionCalibrationAsset->Destination);
+		}
+	}
+
+	if (bTargetChanged)
 	{
 		ReprojectionCalibrationViewport->InvalidateBrushes();
 	}

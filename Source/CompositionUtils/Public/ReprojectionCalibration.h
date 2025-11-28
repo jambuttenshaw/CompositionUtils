@@ -9,8 +9,8 @@
 /**
  * Composition Utils: Base class for encapsulating a target for reprojection (either as a source or destination)
  */
-UCLASS()
-class COMPOSITIONUTILS_API UReprojectionCalibrationTargetBase : public UDataAsset
+UCLASS(editinlinenew, Abstract)
+class COMPOSITIONUTILS_API UReprojectionCalibrationTargetBase : public UObject
 {
 	GENERATED_BODY()
 public:
@@ -33,11 +33,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly)
 	FTransform ExtrinsicTransform;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, meta = (ShowOnlyInnerProperties))
 	TObjectPtr<UReprojectionCalibrationTargetBase> Source;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
-
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, meta = (ShowOnlyInnerProperties))
 	TObjectPtr<UReprojectionCalibrationTargetBase> Destination;
 };
 
