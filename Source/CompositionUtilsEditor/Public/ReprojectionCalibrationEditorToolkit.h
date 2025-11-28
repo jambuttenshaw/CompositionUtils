@@ -27,6 +27,9 @@ private:
 	TObjectPtr<UTexture> GetSource() const;
 	TObjectPtr<UTexture> GetDestination() const;
 
+	void TickSourceTexture() const;
+	void TickDestinationTexture() const;
+
 	void OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const;
 
 private:

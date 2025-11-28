@@ -14,7 +14,9 @@ void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& I
 
 	ReprojectionCalibrationViewport = SNew(SReprojectionCalibrationViewWidget)
 										.SourceTexture(this, &FReprojectionCalibrationEditorToolkit::GetSource)
-										.DestinationTexture(this, &FReprojectionCalibrationEditorToolkit::GetDestination);
+										.DestinationTexture(this, &FReprojectionCalibrationEditorToolkit::GetDestination)
+										.TickSourceTexture(this, &FReprojectionCalibrationEditorToolkit::TickSourceTexture)
+										.TickDestinationTexture(this, &FReprojectionCalibrationEditorToolkit::TickDestinationTexture);
 
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout")
 	->AddArea(
@@ -103,6 +105,30 @@ TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetDestination() con
 {
 	check(ReprojectionCalibrationAsset);
 	return ReprojectionCalibrationAsset->Destination ? ReprojectionCalibrationAsset->Destination->GetTexture() : nullptr;
+}
+
+void FReprojectionCalibrationEditorToolkit::TickSourceTexture() const
+{
+	check(ReprojectionCalibrationAsset);
+	if (ReprojectionCalibrationAsset->Source)
+	{
+		if (ReprojectionCalibrationAsset->Source->TickTexture())
+		{
+			ReprojectionCalibrationViewport->InvalidateBrushes();
+		}
+	}
+}
+
+void FReprojectionCalibrationEditorToolkit::TickDestinationTexture() const
+{
+	check(ReprojectionCalibrationAsset);
+	if (ReprojectionCalibrationAsset->Destination)
+	{
+		if (ReprojectionCalibrationAsset->Destination->TickTexture())
+		{
+			ReprojectionCalibrationViewport->InvalidateBrushes();
+		}
+	}
 }
 
 void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const

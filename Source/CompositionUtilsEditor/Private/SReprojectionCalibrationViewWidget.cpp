@@ -8,6 +8,9 @@ void SReprojectionCalibrationViewWidget::Construct(const FArguments& InArgs)
 	SourceTexture = InArgs._SourceTexture;
 	DestinationTexture = InArgs._DestinationTexture;
 
+	TickSourceTexture = InArgs._TickSourceTexture;
+	TickDestinationTexture = InArgs._TickDestinationTexture;
+
 	FallbackBrush = FCoreStyle::Get().GetBrush("Checkerboard");
 
 	ChildSlot
@@ -16,7 +19,7 @@ void SReprojectionCalibrationViewWidget::Construct(const FArguments& InArgs)
 			.Stretch(EStretch::ScaleToFit)
 			.StretchDirection(EStretchDirection::Both)
 			.HAlign(HAlign_Fill)
-			.VAlign(VAlign_Fill)
+			.VAlign(VAlign_Top)
 			[
 				SNew(SHorizontalBox)
 					+ SHorizontalBox::Slot()
@@ -51,6 +54,14 @@ void SReprojectionCalibrationViewWidget::Construct(const FArguments& InArgs)
 					]
 			]
 	];
+}
+
+void SReprojectionCalibrationViewWidget::Tick(const FGeometry& AllottedGeometry, const double InCurrentTime, const float InDeltaTime)
+{
+	SCompoundWidget::Tick(AllottedGeometry, InCurrentTime, InDeltaTime);
+
+	TickSourceTexture.ExecuteIfBound();
+	TickDestinationTexture.ExecuteIfBound();
 }
 
 void SReprojectionCalibrationViewWidget::InvalidateBrushes()
