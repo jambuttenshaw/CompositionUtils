@@ -5,7 +5,7 @@
 #include "Toolkits/AssetEditorToolkit.h"
 
 
-class SReprojectionCalibrationViewWidget;
+class SReprojectionCalibrationViewer;
 
 class FReprojectionCalibrationEditorToolkit : public FAssetEditorToolkit
 {
@@ -32,8 +32,8 @@ private:
 private:
 	UReprojectionCalibration* ReprojectionCalibrationAsset = nullptr;
 
-	static const FName ViewportTabId;
+	static const FName ViewerTabId;
 	static const FName DetailsTabId;
 
-	TSharedPtr<SReprojectionCalibrationViewWidget> ReprojectionCalibrationViewport;
+	TSharedPtr<SReprojectionCalibrationViewer> ReprojectionCalibrationViewer;
 };

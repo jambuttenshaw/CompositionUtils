@@ -4,10 +4,10 @@
 
 DECLARE_DELEGATE(FTickTargetTexture)
 
-class COMPOSITIONUTILSEDITOR_API SReprojectionCalibrationViewWidget : public SCompoundWidget
+class COMPOSITIONUTILSEDITOR_API SReprojectionCalibrationViewer : public SCompoundWidget
 {
 public:
-	SLATE_BEGIN_ARGS(SReprojectionCalibrationViewWidget)
+	SLATE_BEGIN_ARGS(SReprojectionCalibrationViewer)
 		{}
 		SLATE_ATTRIBUTE(TObjectPtr<UTexture>, SourceTexture)
 		SLATE_ATTRIBUTE(TObjectPtr<UTexture>, DestinationTexture)

@@ -1,10 +1,10 @@
 #include "ReprojectionCalibrationEditorToolkit.h"
-#include "Widgets/SReprojectionCalibrationViewWidget.h"
+#include "Widgets/SReprojectionCalibrationViewer.h"
 
 #define LOCTEXT_NAMESPACE "FCompositionUtilsEditorModule"
 
 
-const FName FReprojectionCalibrationEditorToolkit::ViewportTabId = "ReprojectionCalibrationViewportTab";
+const FName FReprojectionCalibrationEditorToolkit::ViewerTabId = "ReprojectionCalibrationViewerTab";
 const FName FReprojectionCalibrationEditorToolkit::DetailsTabId = "ReprojectionCalibrationDetailsTab";
 
 
@@ -12,17 +12,17 @@ void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& I
 {
 	ReprojectionCalibrationAsset = Cast<UReprojectionCalibration>(InObjects[0]);
 
-	ReprojectionCalibrationViewport = SNew(SReprojectionCalibrationViewWidget)
+	ReprojectionCalibrationViewer = SNew(SReprojectionCalibrationViewer)
 										.SourceTexture(this, &FReprojectionCalibrationEditorToolkit::GetSource)
 										.DestinationTexture(this, &FReprojectionCalibrationEditorToolkit::GetDestination);
 
-	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout")
+	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout_v2")
 	->AddArea(
 		FTabManager::NewPrimaryArea()->SetOrientation(Orient_Horizontal)
 		->Split(
 			FTabManager::NewStack()
 			->SetSizeCoefficient(0.8f)
-			->AddTab(ViewportTabId, ETabState::OpenedTab)
+			->AddTab(ViewerTabId, ETabState::OpenedTab)
 			->SetHideTabWell(true)
 		)
 		->Split(
@@ -48,8 +48,8 @@ void FReprojectionCalibrationEditorToolkit::RegisterTabSpawners(const TSharedRef
 
 	WorkspaceMenuCategory = InTabManager->AddLocalWorkspaceMenuCategory(INVTEXT("Reprojection Calibrator"));
 
-	InTabManager->RegisterTabSpawner(ViewportTabId, FOnSpawnTab::CreateSP(this, &FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpawnViewport))
-		.SetDisplayName(INVTEXT("Dynamic Brush Test"))
+	InTabManager->RegisterTabSpawner(ViewerTabId, FOnSpawnTab::CreateSP(this, &FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpawnViewport))
+		.SetDisplayName(INVTEXT("Viewer"))
 		.SetGroup((WorkspaceMenuCategory.ToSharedRef()));
 
 	InTabManager->RegisterTabSpawner(DetailsTabId, FOnSpawnTab::CreateSP(this, &FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpawnDetails))
@@ -60,17 +60,17 @@ void FReprojectionCalibrationEditorToolkit::RegisterTabSpawners(const TSharedRef
 void FReprojectionCalibrationEditorToolkit::UnregisterTabSpawners(const TSharedRef<FTabManager>& InTabManager)
 {
 	FAssetEditorToolkit::UnregisterTabSpawners(InTabManager);
-	InTabManager->UnregisterTabSpawner(ViewportTabId);
+	InTabManager->UnregisterTabSpawner(ViewerTabId);
 	InTabManager->UnregisterTabSpawner(DetailsTabId);
 }
 
 TSharedRef<SDockTab> FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpawnViewport(const FSpawnTabArgs& Args) const
 {
-	check(Args.GetTabId() == ViewportTabId);
+	check(Args.GetTabId() == ViewerTabId);
 
 	return SNew(SDockTab)
 		[
-			ReprojectionCalibrationViewport.ToSharedRef()
+			ReprojectionCalibrationViewer.ToSharedRef()
 		];
 }
 
@@ -129,7 +129,7 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 
 	if (bTargetChanged)
 	{
-		ReprojectionCalibrationViewport->InvalidateBrushes();
+		ReprojectionCalibrationViewer->InvalidateBrushes();
 	}
 }
 

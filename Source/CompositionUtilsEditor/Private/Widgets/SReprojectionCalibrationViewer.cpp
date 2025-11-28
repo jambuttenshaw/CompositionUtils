@@ -1,9 +1,9 @@
-#include "Widgets/SReprojectionCalibrationViewWidget.h"
+#include "Widgets/SReprojectionCalibrationViewer.h"
 
 #include "Widgets/Layout/SScaleBox.h"
 
 
-void SReprojectionCalibrationViewWidget::Construct(const FArguments& InArgs)
+void SReprojectionCalibrationViewer::Construct(const FArguments& InArgs)
 {
 	SourceTexture = InArgs._SourceTexture;
 	DestinationTexture = InArgs._DestinationTexture;
@@ -53,13 +53,13 @@ void SReprojectionCalibrationViewWidget::Construct(const FArguments& InArgs)
 	];
 }
 
-void SReprojectionCalibrationViewWidget::InvalidateBrushes()
+void SReprojectionCalibrationViewer::InvalidateBrushes()
 {
 	SourceBrush.Reset();
 	DestinationBrush.Reset();
 }
 
-const FSlateBrush* SReprojectionCalibrationViewWidget::GetSourceImageBrush()
+const FSlateBrush* SReprojectionCalibrationViewer::GetSourceImageBrush()
 {
 	if (SourceBrush.IsValid())
 		return SourceBrush.Get();
@@ -67,7 +67,7 @@ const FSlateBrush* SReprojectionCalibrationViewWidget::GetSourceImageBrush()
 	return TryCreateNewBrush(SourceTexture, SourceBrush, FallbackBrush);
 }
 
-const FSlateBrush* SReprojectionCalibrationViewWidget::GetDestinationImageBrush()
+const FSlateBrush* SReprojectionCalibrationViewer::GetDestinationImageBrush()
 {
 	if (DestinationBrush.IsValid())
 		return DestinationBrush.Get();
@@ -75,7 +75,7 @@ const FSlateBrush* SReprojectionCalibrationViewWidget::GetDestinationImageBrush(
 	return TryCreateNewBrush(DestinationTexture, DestinationBrush, FallbackBrush);
 }
 
-const FSlateBrush* SReprojectionCalibrationViewWidget::TryCreateNewBrush(const TAttribute<TObjectPtr<UTexture>>& Image, TSharedPtr<FSlateImageBrush>& OutBrush, const FSlateBrush* Fallback)
+const FSlateBrush* SReprojectionCalibrationViewer::TryCreateNewBrush(const TAttribute<TObjectPtr<UTexture>>& Image, TSharedPtr<FSlateImageBrush>& OutBrush, const FSlateBrush* Fallback)
 {
 	if (Image.IsSet())
 	{
