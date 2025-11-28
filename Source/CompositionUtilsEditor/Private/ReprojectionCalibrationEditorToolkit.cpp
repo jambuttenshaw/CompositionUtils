@@ -93,16 +93,16 @@ TSharedRef<SDockTab> FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpaw
 		];
 }
 
-TObjectPtr<UObject> FReprojectionCalibrationEditorToolkit::GetSource() const
+TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetSource() const
 {
 	check(ReprojectionCalibrationAsset);
-	return ReprojectionCalibrationAsset->Source;
+	return ReprojectionCalibrationAsset->Source ? ReprojectionCalibrationAsset->Source->GetTexture() : nullptr;
 }
 
-TObjectPtr<UObject> FReprojectionCalibrationEditorToolkit::GetDestination() const
+TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetDestination() const
 {
 	check(ReprojectionCalibrationAsset);
-	return ReprojectionCalibrationAsset->Destination;
+	return ReprojectionCalibrationAsset->Destination ? ReprojectionCalibrationAsset->Destination->GetTexture() : nullptr;
 }
 
 void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const

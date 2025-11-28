@@ -25,7 +25,8 @@ public class CompositionUtils : ModuleRules
                 "RenderCore",
                 "Renderer",
                 "RHI",
-                "RHICore"
+                "RHICore",
+                "MediaAssets"
             }
 			);
 

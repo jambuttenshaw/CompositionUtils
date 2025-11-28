@@ -75,7 +75,7 @@ const FSlateBrush* SReprojectionCalibrationViewWidget::GetDestinationImageBrush(
 	return TryCreateNewBrush(DestinationTexture, DestinationBrush, FallbackBrush);
 }
 
-const FSlateBrush* SReprojectionCalibrationViewWidget::TryCreateNewBrush(const TAttribute<TObjectPtr<UObject>>& Image, TSharedPtr<FSlateImageBrush>& OutBrush, const FSlateBrush* Fallback)
+const FSlateBrush* SReprojectionCalibrationViewWidget::TryCreateNewBrush(const TAttribute<TObjectPtr<UTexture>>& Image, TSharedPtr<FSlateImageBrush>& OutBrush, const FSlateBrush* Fallback)
 {
 	if (Image.IsSet())
 	{

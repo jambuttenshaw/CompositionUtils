@@ -7,8 +7,8 @@ class COMPOSITIONUTILSEDITOR_API SReprojectionCalibrationViewWidget : public SCo
 public:
 	SLATE_BEGIN_ARGS(SReprojectionCalibrationViewWidget)
 		{}
-		SLATE_ATTRIBUTE(TObjectPtr<UObject>, SourceTexture)
-		SLATE_ATTRIBUTE(TObjectPtr<UObject>, DestinationTexture)
+		SLATE_ATTRIBUTE(TObjectPtr<UTexture>, SourceTexture)
+		SLATE_ATTRIBUTE(TObjectPtr<UTexture>, DestinationTexture)
 	SLATE_END_ARGS()
 
 	void Construct(const FArguments& InArgs);
@@ -22,13 +22,13 @@ private:
 	// Tries to create a brush from the image stored in attribute Image
 	// If it succeeds, it will store the created brush in OutBrush
 	// If it fails, it will return the fallback brush
-	const FSlateBrush* TryCreateNewBrush(const TAttribute<TObjectPtr<UObject>>& Image, TSharedPtr<FSlateImageBrush>& OutBrush, const FSlateBrush* Fallback);
+	const FSlateBrush* TryCreateNewBrush(const TAttribute<TObjectPtr<UTexture>>& Image, TSharedPtr<FSlateImageBrush>& OutBrush, const FSlateBrush* Fallback);
 
 private:
 	const FSlateBrush* FallbackBrush = nullptr;
 
-	TAttribute<TObjectPtr<UObject>> SourceTexture;
-	TAttribute<TObjectPtr<UObject>> DestinationTexture;
+	TAttribute<TObjectPtr<UTexture>> SourceTexture;
+	TAttribute<TObjectPtr<UTexture>> DestinationTexture;
 
 	TSharedPtr<FSlateImageBrush> SourceBrush;
 	TSharedPtr<FSlateImageBrush> DestinationBrush;
