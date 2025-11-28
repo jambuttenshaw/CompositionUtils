@@ -16,7 +16,7 @@ class COMPOSITIONUTILS_API UReprojectionCalibrationTargetBase : public UDataAsse
 public:
 
 	// Interface that allows derived classes to provide their own targets
-	virtual TObjectPtr<UTexture> GetTexture() const { return nullptr; }
+	virtual TObjectPtr<UTexture> GetTexture() { return nullptr; }
 };
 
 
@@ -57,6 +57,6 @@ public:
 public:
 
 	//~ Begin UReprojectionCalibrationTarget Interface
-	virtual TObjectPtr<UTexture> GetTexture() const override;
+	virtual TObjectPtr<UTexture> GetTexture() override;
 	//~ End UReprojectionCalibrationTarget Interface
 };

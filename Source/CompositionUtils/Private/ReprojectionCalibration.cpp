@@ -9,7 +9,7 @@ UReprojectionCalibration::UReprojectionCalibration()
 }
 
 
-TObjectPtr<UTexture> UReprojectionCalibrationMediaTarget::GetTexture() const
+TObjectPtr<UTexture> UReprojectionCalibrationMediaTarget::GetTexture()
 {
 	return MediaTexture;
 }
