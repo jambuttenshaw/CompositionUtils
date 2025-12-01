@@ -5,6 +5,9 @@
 #include "Modules/ModuleManager.h"
 #include "ReprojectionCalibrationActions.h"
 
+
+DECLARE_LOG_CATEGORY_EXTERN(LogCompositionUtilsEditor, Log, All);
+
 class FCompositionUtilsEditorModule : public IModuleInterface
 {
 public:

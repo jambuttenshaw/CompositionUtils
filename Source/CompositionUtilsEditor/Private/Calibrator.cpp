@@ -4,39 +4,167 @@
 #include "RenderGraphBuilder.h"
 #include "RenderGraphUtils.h"
 
+#include "ReprojectionCalibration.h"
 
-bool FCalibrator::RunCalibration(TObjectPtr<UTexture> Source, TObjectPtr<UTexture> Destination)
+#include "OpenCVHelper.h"
+
+#define LOCTEXT_NAMESPACE "FCompositionUtilsEditorModule"
+
+
+void FCalibrator::ResetCalibrationState(TObjectPtr<UReprojectionCalibration> InAsset)
 {
-	if (!Source || !Destination)
+	Asset = InAsset;
+
+	SourceCorners.Empty();
+	DestinationCorners.Empty();
+
+	for (auto& Resources : TransientResources)
 	{
-		return false;
+		Resources.bValidDebugView = false;
 	}
 
-	CopyToIntermediate(Source, SourceIntermediateRT);
-	CopyToIntermediate(Destination, DestinationIntermediateRT);
+	const auto& Dims = Asset->CheckerboardDimensions;
+	ObjectPoints.Init({}, Dims.X * Dims.Y);
+	for (int32 X = 0; X < Dims.X; X++)
+	for (int32 Y = 0; Y < Dims.X; Y++)
+	{
+		ObjectPoints.Add(FVector3f{ X * Asset->CheckerboardSize, Y * Asset->CheckerboardSize, 0.0f });
+	}
+}
 
-	return true;
+void FCalibrator::ResetTransientResources()
+{
+	for (auto& Resources : TransientResources)
+	{
+		Resources.ReleaseAll();
+	}
+}
+
+FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
+	TObjectPtr<UTexture> Source, 
+	TObjectPtr<UTexture> Destination)
+{
+	// Owner of Calibrator should ALWAYS make sure ResetCalibrationState has been called before RunCalibration
+	check(Asset);
+
+	if (!(Asset->CheckerboardDimensions.X > 0 && Asset->CheckerboardDimensions.Y > 0 && Asset->CheckerboardSize > 0.0f))	
+	{
+		return ECalibrationResult::Error_InvalidParams;
+	}
+
+	for (auto& Resources : TransientResources)
+	{
+		Resources.bValidDebugView = false;
+	}
+
+	// Calibration relies on OpenCV to run
+#if WITH_OPENCV
+	if (!Source || !Destination)
+	{
+		return ECalibrationResult::Error_MissingSourceOrDestination;
+	}
+
+	// First, find checkerboard corners for the current pair of images
+	ECalibrationResult Result = FindCheckerboardCorners(Asset, Source, TransientResources[Resources_Source], SourceCorners);
+	if (Result != ECalibrationResult::Success)
+	{
+		return Result;
+	}
+
+	Result = FindCheckerboardCorners(Asset, Destination, TransientResources[Resources_Destination], DestinationCorners);
+	if (Result != ECalibrationResult::Success)
+	{
+		// To make it less confusing, either show both successful debug images or neither
+		TransientResources[Resources_Source].bValidDebugView = false;
+		return Result;
+	}
+
+	// With checkerboard corners found, attempt to solve for the pose of each camera
+
+	return ECalibrationResult::Success;
+#else
+	// Calibration can never succeed without OpenCV
+	return ECalibrationResult::Error_NoOpenCV;
+#endif
 }
 
 TObjectPtr<UTexture> FCalibrator::GetCalibratedSourceDebugView() const
 {
-	return SourceIntermediateRT.IsValid() ? SourceIntermediateRT.Get() : nullptr;
+	return GetDebugView(TransientResources[Resources_Source]);
 }
 
 TObjectPtr<UTexture> FCalibrator::GetCalibratedDestinationDebugView() const
 {
-	return DestinationIntermediateRT.IsValid() ? DestinationIntermediateRT.Get() : nullptr;
+	return GetDebugView(TransientResources[Resources_Destination]);
 }
 
-void FCalibrator::InvalidateTransientResources()
+TObjectPtr<UTexture> FCalibrator::GetDebugView(const FTransientResources& Resources)
 {
-	SourceIntermediateRT.Reset();
-	DestinationIntermediateRT.Reset();
-
-	SourceDebugView.Reset();
-	DestinationDebugView.Reset();
+	if (Resources.bValidDebugView)
+	{
+		check(Resources.DebugView.IsValid() && Resources.DebugView->GetResource());
+		return Resources.DebugView.Get();
+	}
+	return nullptr;
 }
 
+
+FCalibrator::ECalibrationResult FCalibrator::FindCheckerboardCorners(
+	TObjectPtr<UReprojectionCalibration> Asset, 
+	TObjectPtr<UTexture> InTexture, 
+	FTransientResources& Resources, 
+	TArray<FVector2f>& OutCorners)
+{
+	// Copying to an intermediate texture handles format conversion and allows us to use UTextureRenderTarget2D's API here
+	CopyToIntermediate(InTexture, Resources.Intermediate);
+
+	TArray<FColor> ImageData;
+	if (!Resources.Intermediate->GameThread_GetRenderTargetResource()->ReadPixels(ImageData))
+	{
+		return ECalibrationResult::Error_ReadTextureFailure;
+	}
+
+	FIntPoint SourceImageSize{
+		static_cast<int32>(InTexture->GetSurfaceWidth()),
+		static_cast<int32>(InTexture->GetSurfaceHeight())
+	};
+
+	if (!FOpenCVHelper::IdentifyCheckerboard(ImageData, SourceImageSize, Asset->CheckerboardDimensions, OutCorners))
+	{
+		return ECalibrationResult::Error_IdentifyCheckerboardFailure;
+	}
+
+	if (!Resources.DebugView
+	 || !Resources.DebugView->GetPlatformData()
+	 ||  Resources.DebugView->GetPlatformData()->Mips.IsEmpty())
+	{
+		Resources.DebugView.Reset(
+			UTexture2D::CreateTransient(SourceImageSize.X, SourceImageSize.Y, Resources.Intermediate->GetFormat(), NAME_None, {})
+		);
+		Resources.DebugView->SRGB = false;
+	}
+
+	{
+		auto& Mip = Resources.DebugView->GetPlatformData()->Mips[0];
+
+		TConstArrayView64<uint8> ImageDataView(reinterpret_cast<uint8*>(ImageData.GetData()), ImageData.Num() * ImageData.GetTypeSize());
+
+		void* DestImageData = Mip.BulkData.Lock(LOCK_READ_WRITE);
+		FMemory::Memcpy(DestImageData, ImageDataView.GetData(), ImageDataView.NumBytes());
+		Mip.BulkData.Unlock();
+
+		Resources.DebugView->UpdateResource();
+	}
+
+	if (!FOpenCVHelper::DrawCheckerboardCorners(OutCorners, Asset->CheckerboardDimensions, Resources.DebugView.Get()))
+	{
+		return ECalibrationResult::Error_DrawCheckerboardFailure;
+	}
+
+	Resources.bValidDebugView = true;
+
+	return ECalibrationResult::Success;
+}
 
 void FCalibrator::CopyToIntermediate(TObjectPtr<UTexture> InTexture, TStrongObjectPtr<UTextureRenderTarget2D>& IntermediateTexture)
 {
@@ -78,33 +206,12 @@ UTextureRenderTarget2D* FCalibrator::CreateRenderTargetFrom(TObjectPtr<UTexture>
 	if (!InTexture)
 		return nullptr;
 
-	// Fallback format
-	EPixelFormat Format = PF_R8G8B8A8;
-	FIntPoint Size = FIntPoint::ZeroValue;
+	// TODO: Allow targets to specify themselves to force linear gamma or not
 	bool bLinearGamma = true;
-
-	if (UTexture2D* Texture2D = Cast<UTexture2D>(InTexture))
-	{
-		Format = Texture2D->GetPixelFormat();
-		Size.X = Texture2D->GetSizeX();
-		Size.Y = Texture2D->GetSizeY();
-	}
-	else if (UTextureRenderTarget2D* TextureRenderTarget2D = Cast<UTextureRenderTarget2D>(InTexture))
-	{
-		Format = TextureRenderTarget2D->GetFormat();
-		Size.X = TextureRenderTarget2D->GetSurfaceWidth();
-		Size.Y = TextureRenderTarget2D->GetSurfaceHeight();
-	}
-	else if (UMediaTexture* MediaTexture = Cast<UMediaTexture>(InTexture))
+	if (Cast<UMediaTexture>(InTexture))
 	{
 		// Fallback to default format for media textures
-		Size.X = MediaTexture->GetWidth();
-		Size.Y = MediaTexture->GetHeight();
 		bLinearGamma = false;
-	}
-	else
-	{
-		check(false && "Unhandled texture type!");
 	}
 	
 	UTextureRenderTarget2D* OutTexture = NewObject<UTextureRenderTarget2D>(GetTransientPackage());
@@ -113,8 +220,36 @@ UTextureRenderTarget2D* FCalibrator::CreateRenderTargetFrom(TObjectPtr<UTexture>
 	OutTexture->ClearColor = FLinearColor::Black;
 	OutTexture->bAutoGenerateMips = false;
 	OutTexture->bCanCreateUAV = false;
-	OutTexture->InitCustomFormat(Size.X, Size.Y, Format, bLinearGamma);
+	OutTexture->InitCustomFormat(InTexture->GetSurfaceWidth(), InTexture->GetSurfaceHeight(), PF_B8G8R8A8, bLinearGamma);
 	OutTexture->UpdateResourceImmediate(bClearRenderTarget);
 
 	return OutTexture;
 }
+
+
+FText FCalibrator::GetErrorTextForResult(ECalibrationResult Result)
+{
+	switch (Result)
+	{
+	case ECalibrationResult::Success:
+		return LOCTEXT("CalibrationResultSuccess", "Success");
+	case ECalibrationResult::Error_NoOpenCV:
+		return LOCTEXT("CalibrationResultNoOpenCV", "Platform does not support OpenCV, calibration is not possible.");
+	case ECalibrationResult::Error_InvalidParams:
+		return LOCTEXT("CalibrationResultInvalidParams", "Calibration Asset contains invalid parameters. Ensure checkerboard parameters are set correctly.");
+	case ECalibrationResult::Error_MissingSourceOrDestination:
+		return LOCTEXT("CalibrationResultMissingSourceOrDestination", "Source or Destination target feed was missing. Ensure a valid target is selected before calibration.");
+	case ECalibrationResult::Error_ReadTextureFailure:
+		return LOCTEXT("CalibrationResultReadTextureFailure", "Internal error: Failed to read data from texture.");
+	case ECalibrationResult::Error_IdentifyCheckerboardFailure:
+		return LOCTEXT("CalibrationResultIdentifyCheckerboardFailure", "Failed to identify checkerboard in either source feed, destination feed, or both. Please retry.");
+	case ECalibrationResult::Error_DrawCheckerboardFailure:
+		return LOCTEXT("CalibrationResultDrawCheckerboardFailure", "Internal error: Failed to draw debug checkerboard.");
+	}
+
+	checkNoEntry();
+	return LOCTEXT("CalibrationResultUnhandledCase", "Unhandled ECalibrationResult in GetErrorTextForResult!");
+}
+
+
+#undef LOCTEXT_NAMESPACE

@@ -30,6 +30,10 @@
 		{
 			"Name": "Composure",
 			"Enabled": true
+		},
+		{
+			"Name": "OpenCV",
+			"Enabled":  true
 		}
 	]
 }

@@ -31,8 +31,24 @@ public class CompositionUtilsEditor : ModuleRules
                 "RHI",
                 "RHICore",
 
-                "MediaAssets"
+                "MediaAssets",
+				"OpenCV",
+				"OpenCVHelper"
             }
         );
+
+        // OpenCV is used for calibration
+        if (Target.Platform == UnrealTargetPlatform.Win64)
+        {
+            PublicDefinitions.Add("WITH_OPENCV=1");
+        }
+        else if (Target.Platform == UnrealTargetPlatform.Linux)
+        {
+            PublicDefinitions.Add("WITH_OPENCV=1");
+        }
+        else // unsupported platform
+        {
+            PublicDefinitions.Add("WITH_OPENCV=0");
+        }
     }
 }

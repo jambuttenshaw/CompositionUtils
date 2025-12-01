@@ -38,6 +38,12 @@ public:
 
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category = "Calibration", meta = (ShowOnlyInnerProperties))
 	TObjectPtr<UReprojectionCalibrationTargetBase> Destination;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Calibration")
+	FIntPoint CheckerboardDimensions;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Calibration")
+	float CheckerboardSize;
 };
 
 

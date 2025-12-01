@@ -1,5 +1,6 @@
 #include "ReprojectionCalibrationEditorToolkit.h"
 
+#include "CompositionUtilsEditor.h"
 #include "Widgets/SReprojectionCalibrationControls.h"
 #include "Widgets/SReprojectionCalibrationViewer.h"
 #include "Widgets/Layout/SScaleBox.h"
@@ -28,10 +29,12 @@ void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& I
 		.OnResetCalibrationPressed(this, &FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed);
 
 	CalibratorImpl = MakeUnique<FCalibrator>();
+	CalibratorImpl->ResetCalibrationState(ReprojectionCalibrationAsset);
 
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout_v3")
 	->AddArea(
-		FTabManager::NewPrimaryArea()->SetOrientation(Orient_Horizontal)
+		FTabManager::NewPrimaryArea()
+		->SetOrientation(Orient_Horizontal)
 		->Split(
 			FTabManager::NewSplitter()
 			->SetOrientation(Orient_Vertical)
@@ -183,9 +186,15 @@ void FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed()
 	if (!ReprojectionCalibrationAsset)
 		return;
 
-	if (CalibratorImpl->RunCalibration(GetFeedSource(), GetFeedDestination()))
+	FCalibrator::ECalibrationResult Result = CalibratorImpl->RunCalibration(GetFeedSource(), GetFeedDestination());
+	if (Result == FCalibrator::ECalibrationResult::Success)
 	{
 		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
+	}
+	else
+	{
+		FText ErrorMessage = FCalibrator::GetErrorTextForResult(Result);
+		UE_LOG(LogCompositionUtilsEditor, Error, TEXT("Calibration Error: %s"), *ErrorMessage.ToString())
 	}
 }
 
@@ -194,7 +203,8 @@ void FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed()
 	if (!ReprojectionCalibrationAsset)
 		return;
 
-	ReprojectionCalibrationAsset->ExtrinsicTransform = FTransform::Identity;
+	CalibratorImpl->ResetCalibrationState(ReprojectionCalibrationAsset);
+	ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
 }
 
 void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const
@@ -222,7 +232,19 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 	if (bTargetChanged)
 	{
 		InvalidateAllViewers();
-		CalibratorImpl->InvalidateTransientResources();
+
+		// If target itself has changed, it may be different resolution, must also release transient resources
+		CalibratorImpl->ResetCalibrationState(ReprojectionCalibrationAsset);
+		CalibratorImpl->ResetTransientResources();
+		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
+	}
+
+	// If only checkerboard parameters changed, we don't have to release transient resources
+	if (PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, CheckerboardDimensions)
+	 || PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, CheckerboardSize))
+	{
+		CalibratorImpl->ResetCalibrationState(ReprojectionCalibrationAsset);
+		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
 	}
 }
 

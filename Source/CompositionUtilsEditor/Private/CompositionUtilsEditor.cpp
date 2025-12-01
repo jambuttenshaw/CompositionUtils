@@ -4,6 +4,8 @@
 
 #define LOCTEXT_NAMESPACE "FCompositionUtilsEditorModule"
 
+DEFINE_LOG_CATEGORY(LogCompositionUtilsEditor);
+
 
 void FCompositionUtilsEditorModule::StartupModule()
 {

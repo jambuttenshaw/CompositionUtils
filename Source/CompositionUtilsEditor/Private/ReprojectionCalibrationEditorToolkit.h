@@ -41,7 +41,7 @@ private:
 	void InvalidateAllViewers() const;
 
 private:
-	UReprojectionCalibration* ReprojectionCalibrationAsset = nullptr;
+	TObjectPtr<UReprojectionCalibration> ReprojectionCalibrationAsset = nullptr;
 
 	static const FName ViewerTabId;
 	static const FName DetailsTabId;
