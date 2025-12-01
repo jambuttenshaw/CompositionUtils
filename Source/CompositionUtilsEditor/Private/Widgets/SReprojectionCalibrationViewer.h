@@ -2,9 +2,7 @@
 
 #include "CoreMinimal.h"
 
-DECLARE_DELEGATE(FTickTargetTexture)
-
-class COMPOSITIONUTILSEDITOR_API SReprojectionCalibrationViewer : public SCompoundWidget
+class SReprojectionCalibrationViewer : public SCompoundWidget
 {
 public:
 	SLATE_BEGIN_ARGS(SReprojectionCalibrationViewer)

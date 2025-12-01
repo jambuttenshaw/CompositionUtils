@@ -6,6 +6,7 @@
 
 
 class SReprojectionCalibrationViewer;
+class SReprojectionCalibrationControls;
 
 class FReprojectionCalibrationEditorToolkit : public FAssetEditorToolkit
 {
@@ -23,12 +24,16 @@ public:
 private:
 	TSharedRef<SDockTab> HandleTabSpawnerSpawnViewport(const FSpawnTabArgs& Args) const;
 	TSharedRef<SDockTab> HandleTabSpawnerSpawnDetails(const FSpawnTabArgs& Args) const;
+	TSharedRef<SDockTab> HandleTabSpawnerSpawnControls(const FSpawnTabArgs& Args) const;
 
 	TObjectPtr<UTexture> GetFeedSource() const;
 	TObjectPtr<UTexture> GetFeedDestination() const;
 
 	TObjectPtr<UTexture> GetCalibrationImageSource() const;
 	TObjectPtr<UTexture> GetCalibrationImageDestination() const;
+
+	void OnCaptureImagePressed();
+	void OnResetCalibrationPressed();
 
 	void OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const;
 
@@ -39,6 +44,7 @@ private:
 
 	static const FName ViewerTabId;
 	static const FName DetailsTabId;
+	static const FName ControlsTabId;
 
 	enum ViewerTypes
 	{
@@ -47,4 +53,6 @@ private:
 		Viewer_Count
 	};
 	TStaticArray<TSharedPtr<SReprojectionCalibrationViewer>, Viewer_Count> ReprojectionCalibrationViewers;
+	TSharedPtr<SReprojectionCalibrationControls> ReprojectionCalibrationControls;
+
 };

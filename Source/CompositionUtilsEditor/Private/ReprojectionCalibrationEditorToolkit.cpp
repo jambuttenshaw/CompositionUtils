@@ -1,5 +1,6 @@
 #include "ReprojectionCalibrationEditorToolkit.h"
 
+#include "Widgets/SReprojectionCalibrationControls.h"
 #include "Widgets/SReprojectionCalibrationViewer.h"
 #include "Widgets/Layout/SScaleBox.h"
 
@@ -8,6 +9,7 @@
 
 const FName FReprojectionCalibrationEditorToolkit::ViewerTabId = "ReprojectionCalibrationViewerTab";
 const FName FReprojectionCalibrationEditorToolkit::DetailsTabId = "ReprojectionCalibrationDetailsTab";
+const FName FReprojectionCalibrationEditorToolkit::ControlsTabId = "ReprojectionCalibrationControlsTab";
 
 
 void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& InObjects)
@@ -21,14 +23,29 @@ void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& I
 		.SourceTexture(this, &FReprojectionCalibrationEditorToolkit::GetCalibrationImageSource)
 		.DestinationTexture(this, &FReprojectionCalibrationEditorToolkit::GetCalibrationImageDestination);
 
-	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout_v2")
+	ReprojectionCalibrationControls = SNew(SReprojectionCalibrationControls)
+		.OnCaptureImagePressed(this, &FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed)
+		.OnResetCalibrationPressed(this, &FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed);
+
+	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout_v3")
 	->AddArea(
 		FTabManager::NewPrimaryArea()->SetOrientation(Orient_Horizontal)
 		->Split(
-			FTabManager::NewStack()
+			FTabManager::NewSplitter()
+			->SetOrientation(Orient_Vertical)
 			->SetSizeCoefficient(0.8f)
-			->AddTab(ViewerTabId, ETabState::OpenedTab)
-			->SetHideTabWell(true)
+			->Split
+			(
+				FTabManager::NewStack()
+				->SetSizeCoefficient(0.6f)
+				->AddTab(ViewerTabId, ETabState::OpenedTab)
+				->SetHideTabWell(true)
+			)
+			->Split(
+				FTabManager::NewStack()
+				->SetSizeCoefficient(0.4f)
+				->AddTab(ControlsTabId, ETabState::OpenedTab)
+			)
 		)
 		->Split(
 			FTabManager::NewStack()
@@ -60,6 +77,10 @@ void FReprojectionCalibrationEditorToolkit::RegisterTabSpawners(const TSharedRef
 	InTabManager->RegisterTabSpawner(DetailsTabId, FOnSpawnTab::CreateSP(this, &FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpawnDetails))
 		.SetDisplayName(INVTEXT("Details"))
 		.SetGroup(WorkspaceMenuCategory.ToSharedRef());
+
+	InTabManager->RegisterTabSpawner(ControlsTabId, FOnSpawnTab::CreateSP(this, &FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpawnControls))
+		.SetDisplayName(INVTEXT("Controls"))
+		.SetGroup(WorkspaceMenuCategory.ToSharedRef());
 }
 
 void FReprojectionCalibrationEditorToolkit::UnregisterTabSpawners(const TSharedRef<FTabManager>& InTabManager)
@@ -67,6 +88,7 @@ void FReprojectionCalibrationEditorToolkit::UnregisterTabSpawners(const TSharedR
 	FAssetEditorToolkit::UnregisterTabSpawners(InTabManager);
 	InTabManager->UnregisterTabSpawner(ViewerTabId);
 	InTabManager->UnregisterTabSpawner(DetailsTabId);
+	InTabManager->UnregisterTabSpawner(ControlsTabId);
 }
 
 TSharedRef<SDockTab> FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpawnViewport(const FSpawnTabArgs& Args) const
@@ -120,6 +142,16 @@ TSharedRef<SDockTab> FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpaw
 		];
 }
 
+TSharedRef<SDockTab> FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpawnControls(const FSpawnTabArgs& Args) const
+{
+	check(Args.GetTabId() == ControlsTabId);
+
+	return SNew(SDockTab)
+	[
+		ReprojectionCalibrationControls.ToSharedRef()
+	];
+}
+
 TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetFeedSource() const
 {
 	check(ReprojectionCalibrationAsset);
@@ -140,6 +172,20 @@ TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetCalibrationImageS
 TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetCalibrationImageDestination() const
 {
 	return GetFeedDestination();
+}
+
+void FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed()
+{
+	if (!ReprojectionCalibrationAsset)
+		return;
+}
+
+void FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed()
+{
+	if (!ReprojectionCalibrationAsset)
+		return;
+
+	ReprojectionCalibrationAsset->ExtrinsicTransform = FTransform::Identity;
 }
 
 void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const
@@ -170,7 +216,6 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 	}
 }
 
-
 void FReprojectionCalibrationEditorToolkit::InvalidateAllViewers() const
 {
 	for (const auto& Viewer : ReprojectionCalibrationViewers)
@@ -178,7 +223,5 @@ void FReprojectionCalibrationEditorToolkit::InvalidateAllViewers() const
 		Viewer->InvalidateBrushes();
 	}
 }
-
-
 
 #undef LOCTEXT_NAMESPACE
