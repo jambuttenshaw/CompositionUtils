@@ -4,6 +4,7 @@
 #include "ReprojectionCalibration.h"
 #include "Toolkits/AssetEditorToolkit.h"
 
+#include "Calibrator.h"
 
 class SReprojectionCalibrationViewer;
 class SReprojectionCalibrationControls;
@@ -55,4 +56,5 @@ private:
 	TStaticArray<TSharedPtr<SReprojectionCalibrationViewer>, Viewer_Count> ReprojectionCalibrationViewers;
 	TSharedPtr<SReprojectionCalibrationControls> ReprojectionCalibrationControls;
 
+	TUniquePtr<FCalibrator> CalibratorImpl;
 };

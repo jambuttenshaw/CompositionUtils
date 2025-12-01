@@ -27,6 +27,8 @@ void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& I
 		.OnCaptureImagePressed(this, &FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed)
 		.OnResetCalibrationPressed(this, &FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed);
 
+	CalibratorImpl = MakeUnique<FCalibrator>();
+
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout_v3")
 	->AddArea(
 		FTabManager::NewPrimaryArea()->SetOrientation(Orient_Horizontal)
@@ -166,18 +168,25 @@ TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetFeedDestination()
 
 TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetCalibrationImageSource() const
 {
-	return GetFeedSource();
+	TObjectPtr<UTexture> CalibratedSource = CalibratorImpl->GetCalibratedSourceDebugView();
+	return CalibratedSource ? CalibratedSource : GetFeedSource();
 }
 
 TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetCalibrationImageDestination() const
 {
-	return GetFeedDestination();
+	TObjectPtr<UTexture> CalibratedDestination = CalibratorImpl->GetCalibratedDestinationDebugView();
+	return CalibratedDestination ? CalibratedDestination : GetFeedDestination();
 }
 
 void FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed()
 {
 	if (!ReprojectionCalibrationAsset)
 		return;
+
+	if (CalibratorImpl->RunCalibration(GetFeedSource(), GetFeedDestination()))
+	{
+		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
+	}
 }
 
 void FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed()
@@ -213,6 +222,7 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 	if (bTargetChanged)
 	{
 		InvalidateAllViewers();
+		CalibratorImpl->InvalidateTransientResources();
 	}
 }
 

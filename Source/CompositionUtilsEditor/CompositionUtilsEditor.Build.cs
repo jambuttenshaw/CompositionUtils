@@ -24,8 +24,15 @@ public class CompositionUtilsEditor : ModuleRules
                 "Engine",
 				"Slate",
 				"SlateCore",
-                "UnrealEd"
+                "UnrealEd",
+
+                "RenderCore",
+                "Renderer",
+                "RHI",
+                "RHICore",
+
+                "MediaAssets"
             }
-		);
+        );
     }
 }
