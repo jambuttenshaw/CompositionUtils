@@ -30,13 +30,13 @@ class COMPOSITIONUTILS_API UReprojectionCalibration : public UObject
 public:
 	UReprojectionCalibration();
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Calibrated Data")
 	FTransform ExtrinsicTransform;
 
-	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, meta = (ShowOnlyInnerProperties))
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category = "Calibration", meta = (ShowOnlyInnerProperties))
 	TObjectPtr<UReprojectionCalibrationTargetBase> Source;
 
-	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, meta = (ShowOnlyInnerProperties))
+	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category = "Calibration", meta = (ShowOnlyInnerProperties))
 	TObjectPtr<UReprojectionCalibrationTargetBase> Destination;
 };
 

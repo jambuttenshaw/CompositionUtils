@@ -24,10 +24,15 @@ private:
 	TSharedRef<SDockTab> HandleTabSpawnerSpawnViewport(const FSpawnTabArgs& Args) const;
 	TSharedRef<SDockTab> HandleTabSpawnerSpawnDetails(const FSpawnTabArgs& Args) const;
 
-	TObjectPtr<UTexture> GetSource() const;
-	TObjectPtr<UTexture> GetDestination() const;
+	TObjectPtr<UTexture> GetFeedSource() const;
+	TObjectPtr<UTexture> GetFeedDestination() const;
+
+	TObjectPtr<UTexture> GetCalibrationImageSource() const;
+	TObjectPtr<UTexture> GetCalibrationImageDestination() const;
 
 	void OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const;
+
+	void InvalidateAllViewers() const;
 
 private:
 	UReprojectionCalibration* ReprojectionCalibrationAsset = nullptr;
@@ -35,5 +40,11 @@ private:
 	static const FName ViewerTabId;
 	static const FName DetailsTabId;
 
-	TSharedPtr<SReprojectionCalibrationViewer> ReprojectionCalibrationViewer;
+	enum ViewerTypes
+	{
+		Viewer_Feed = 0,
+		Viewer_CalibrationImage,
+		Viewer_Count
+	};
+	TStaticArray<TSharedPtr<SReprojectionCalibrationViewer>, Viewer_Count> ReprojectionCalibrationViewers;
 };

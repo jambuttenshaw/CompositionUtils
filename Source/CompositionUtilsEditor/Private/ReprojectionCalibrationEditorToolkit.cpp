@@ -1,5 +1,7 @@
 #include "ReprojectionCalibrationEditorToolkit.h"
+
 #include "Widgets/SReprojectionCalibrationViewer.h"
+#include "Widgets/Layout/SScaleBox.h"
 
 #define LOCTEXT_NAMESPACE "FCompositionUtilsEditorModule"
 
@@ -12,9 +14,12 @@ void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& I
 {
 	ReprojectionCalibrationAsset = Cast<UReprojectionCalibration>(InObjects[0]);
 
-	ReprojectionCalibrationViewer = SNew(SReprojectionCalibrationViewer)
-										.SourceTexture(this, &FReprojectionCalibrationEditorToolkit::GetSource)
-										.DestinationTexture(this, &FReprojectionCalibrationEditorToolkit::GetDestination);
+	ReprojectionCalibrationViewers[Viewer_Feed] = SNew(SReprojectionCalibrationViewer)
+		.SourceTexture(this, &FReprojectionCalibrationEditorToolkit::GetFeedSource)
+		.DestinationTexture(this, &FReprojectionCalibrationEditorToolkit::GetFeedDestination);
+	ReprojectionCalibrationViewers[Viewer_CalibrationImage] = SNew(SReprojectionCalibrationViewer)
+		.SourceTexture(this, &FReprojectionCalibrationEditorToolkit::GetCalibrationImageSource)
+		.DestinationTexture(this, &FReprojectionCalibrationEditorToolkit::GetCalibrationImageDestination);
 
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout_v2")
 	->AddArea(
@@ -69,9 +74,31 @@ TSharedRef<SDockTab> FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpaw
 	check(Args.GetTabId() == ViewerTabId);
 
 	return SNew(SDockTab)
-		[
-			ReprojectionCalibrationViewer.ToSharedRef()
-		];
+	[
+		SNew(SScaleBox)
+			.Stretch(EStretch::ScaleToFit)
+			.StretchDirection(EStretchDirection::Both)
+			.HAlign(HAlign_Center)
+			.VAlign(VAlign_Top)
+			[
+				SNew(SVerticalBox)
+					+ SVerticalBox::Slot()
+					.FillHeight(1.0f)
+					.HAlign(HAlign_Fill)
+					.VAlign(VAlign_Fill)
+					[
+						ReprojectionCalibrationViewers[Viewer_Feed].ToSharedRef()
+					]
+				+ SVerticalBox::Slot()
+					.FillHeight(1.0f)
+					.HAlign(HAlign_Fill)
+					.VAlign(VAlign_Fill)
+					[
+						ReprojectionCalibrationViewers[Viewer_CalibrationImage].ToSharedRef()
+					]
+			]
+	];
+			
 }
 
 TSharedRef<SDockTab> FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpawnDetails(const FSpawnTabArgs& Args) const
@@ -93,16 +120,26 @@ TSharedRef<SDockTab> FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpaw
 		];
 }
 
-TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetSource() const
+TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetFeedSource() const
 {
 	check(ReprojectionCalibrationAsset);
 	return ReprojectionCalibrationAsset->Source ? ReprojectionCalibrationAsset->Source->GetTexture() : nullptr;
 }
 
-TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetDestination() const
+TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetFeedDestination() const
 {
 	check(ReprojectionCalibrationAsset);
 	return ReprojectionCalibrationAsset->Destination ? ReprojectionCalibrationAsset->Destination->GetTexture() : nullptr;
+}
+
+TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetCalibrationImageSource() const
+{
+	return GetFeedSource();
+}
+
+TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetCalibrationImageDestination() const
+{
+	return GetFeedDestination();
 }
 
 void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const
@@ -129,9 +166,19 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 
 	if (bTargetChanged)
 	{
-		ReprojectionCalibrationViewer->InvalidateBrushes();
+		InvalidateAllViewers();
 	}
 }
+
+
+void FReprojectionCalibrationEditorToolkit::InvalidateAllViewers() const
+{
+	for (const auto& Viewer : ReprojectionCalibrationViewers)
+	{
+		Viewer->InvalidateBrushes();
+	}
+}
+
 
 
 #undef LOCTEXT_NAMESPACE
