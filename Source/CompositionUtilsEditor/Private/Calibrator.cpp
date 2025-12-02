@@ -12,27 +12,18 @@
 #define LOCTEXT_NAMESPACE "FCompositionUtilsEditorModule"
 
 
-void FCalibrator::ResetCalibrationState(TObjectPtr<UReprojectionCalibration> InAsset)
+void FCalibrator::RestartCalibration()
 {
-	Asset = InAsset;
+	NumRuns = 0;
+	WeightSum = 0;
 
-	SourceCorners.Empty();
-	DestinationCorners.Empty();
+	AccumulatedRotation = FQuat::Identity;
+	AccumulatedTranslation = FVector::ZeroVector;
 
+	// It is helpful to clear any debug views from previous runs when calibration is restarted
 	for (auto& Resources : TransientResources)
 	{
 		Resources.bValidDebugView = false;
-	}
-
-	// TODO: Notes on coordinate space
-	const auto& Dims = Asset->CheckerboardDimensions;
-	ObjectPoints.Empty(Dims.X * Dims.Y);
-	for (int32 Y = 0; Y < Dims.Y; Y++)
-	{
-		for (int32 X = 0; X < Dims.X; X++)
-		{
-			ObjectPoints.Add(FVector{ X * Asset->CheckerboardSize, Y * Asset->CheckerboardSize, 0.0 });
-		}
 	}
 }
 
@@ -47,14 +38,15 @@ void FCalibrator::ResetTransientResources()
 FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 	TObjectPtr<UReprojectionCalibrationTargetBase> Source,
 	TObjectPtr<UReprojectionCalibrationTargetBase> Destination,
+	FIntPoint CheckerboardDimensions,
+	float CheckerboardSize,
 	FTransform& OutSourceToDestination)
 {
-	// Owner of Calibrator should ALWAYS make sure ResetCalibrationState has been called before RunCalibration
-	check(Asset);
-
 	// Calibration relies on OpenCV to run
 #if WITH_OPENCV
-	if (!(Asset->CheckerboardDimensions.X > 0 && Asset->CheckerboardDimensions.Y > 0 && Asset->CheckerboardSize > 0.0f))	
+
+	// Validate inputs
+	if (!(CheckerboardDimensions.X > 0 && CheckerboardDimensions.Y > 0 && CheckerboardSize > 0.0f))	
 	{
 		return ECalibrationResult::Error_InvalidParams;
 	}
@@ -70,19 +62,32 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 		return ECalibrationResult::Error_MissingIntrinsics;
 	}
 
+	// Build object space points (this is done every run in case checkerboard has changed)
+	// TODO: Notes on coordinate space
+	TArray<FVector> ObjectPoints;
+	ObjectPoints.Reserve(CheckerboardDimensions.X * CheckerboardDimensions.Y);
+	for (int32 Y = 0; Y < CheckerboardDimensions.Y; Y++)
+	{
+		for (int32 X = 0; X < CheckerboardDimensions.X; X++)
+		{
+			ObjectPoints.Add(FVector{ X * CheckerboardSize, Y * CheckerboardSize, 0.0 });
+		}
+	}
+
 	for (auto& Resources : TransientResources)
 	{
 		Resources.bValidDebugView = false;
 	}
 
 	// First, find checkerboard corners for the current pair of images
-	ECalibrationResult Result = FindCheckerboardCorners(Asset, Source->GetTexture(), TransientResources[Resources_Source], SourceCorners);
+	TArray<FVector2f> SourceCorners, DestinationCorners;
+	ECalibrationResult Result = FindCheckerboardCorners(CheckerboardDimensions, Source->GetTexture(), TransientResources[Resources_Source], SourceCorners);
 	if (Result != ECalibrationResult::Success)
 	{
 		return Result;
 	}
 
-	Result = FindCheckerboardCorners(Asset, Destination->GetTexture(), TransientResources[Resources_Destination], DestinationCorners);
+	Result = FindCheckerboardCorners(CheckerboardDimensions, Destination->GetTexture(), TransientResources[Resources_Destination], DestinationCorners);
 	if (Result != ECalibrationResult::Success)
 	{
 		// To make it less confusing, either show both successful debug images or neither
@@ -121,14 +126,26 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 	}
 
 	// Find the transform to get from Source to Destination
-	FQuat SourceRotation = SourceCameraPose.GetRotation();
-	FQuat DestinationRotation = DestinationCameraPose.GetRotation();
-	FVector SourceTranslation = SourceCameraPose.GetTranslation();
-	FVector DestinationTranslation = DestinationCameraPose.GetTranslation();
+	FQuat SourceToDestinationRotation = SourceCameraPose.GetRotation() * DestinationCameraPose.GetRotation().Inverse();
+	FVector SourceToDestinationTranslation = SourceCameraPose.GetTranslation() - DestinationCameraPose.GetTranslation();
 
-	OutSourceToDestination = FTransform::Identity;
-	OutSourceToDestination.SetRotation(SourceRotation * DestinationRotation.Inverse());
-	OutSourceToDestination.SetTranslation(SourceTranslation - DestinationTranslation);
+	// Weight and accumulate output transform
+	double SourceError = FOpenCVHelper::ComputeReprojectionError(ObjectPoints, SourceCorners, SourceIntrinsics.FocalLength, SourceIntrinsics.ImageCenter, SourceCameraPose);
+	double DestinationError = FOpenCVHelper::ComputeReprojectionError(ObjectPoints, DestinationCorners, DestinationIntrinsics.FocalLength, DestinationIntrinsics.ImageCenter, DestinationCameraPose);
+
+	// Error should never be 0 in reality
+	double Weight = 1.0 / FMath::Max(UE_KINDA_SMALL_NUMBER, SourceError + DestinationError);
+	WeightSum += Weight;
+	double NormalizedWeight = Weight / WeightSum;
+
+	AccumulatedRotation = FQuat::Slerp(AccumulatedRotation, SourceToDestinationRotation, NormalizedWeight);
+	AccumulatedTranslation = FMath::Lerp(AccumulatedTranslation, SourceToDestinationTranslation, NormalizedWeight);
+
+	NumRuns++;
+
+	OutSourceToDestination.SetIdentity();
+	OutSourceToDestination.SetRotation(AccumulatedRotation);
+	OutSourceToDestination.SetTranslation(AccumulatedTranslation);
 
 	return ECalibrationResult::Success;
 #else
@@ -159,7 +176,7 @@ TObjectPtr<UTexture> FCalibrator::GetDebugView(const FTransientResources& Resour
 
 
 FCalibrator::ECalibrationResult FCalibrator::FindCheckerboardCorners(
-	TObjectPtr<UReprojectionCalibration> Asset, 
+	FIntPoint CheckerboardDimensions,
 	TObjectPtr<UTexture> InTexture, 
 	FTransientResources& Resources, 
 	TArray<FVector2f>& OutCorners)
@@ -178,7 +195,7 @@ FCalibrator::ECalibrationResult FCalibrator::FindCheckerboardCorners(
 		static_cast<int32>(InTexture->GetSurfaceHeight())
 	};
 
-	if (!FOpenCVHelper::IdentifyCheckerboard(ImageData, SourceImageSize, Asset->CheckerboardDimensions, OutCorners))
+	if (!FOpenCVHelper::IdentifyCheckerboard(ImageData, SourceImageSize, CheckerboardDimensions, OutCorners))
 	{
 		return ECalibrationResult::Error_IdentifyCheckerboardFailure;
 	}
@@ -205,7 +222,7 @@ FCalibrator::ECalibrationResult FCalibrator::FindCheckerboardCorners(
 		Resources.DebugView->UpdateResource();
 	}
 
-	if (!FOpenCVHelper::DrawCheckerboardCorners(OutCorners, Asset->CheckerboardDimensions, Resources.DebugView.Get()))
+	if (!FOpenCVHelper::DrawCheckerboardCorners(OutCorners, CheckerboardDimensions, Resources.DebugView.Get()))
 	{
 		return ECalibrationResult::Error_DrawCheckerboardFailure;
 	}

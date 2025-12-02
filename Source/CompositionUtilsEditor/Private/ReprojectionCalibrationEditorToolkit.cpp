@@ -29,7 +29,6 @@ void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& I
 		.OnResetCalibrationPressed(this, &FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed);
 
 	CalibratorImpl = MakeUnique<FCalibrator>();
-	CalibratorImpl->ResetCalibrationState(Asset);
 
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout_v3")
 	->AddArea(
@@ -187,7 +186,13 @@ void FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed()
 		return;
 
 	FTransform OutTransform;
-	FCalibrator::ECalibrationResult Result = CalibratorImpl->RunCalibration(Asset->Source, Asset->Destination, OutTransform);
+	FCalibrator::ECalibrationResult Result = CalibratorImpl->RunCalibration(
+		Asset->Source, 
+		Asset->Destination,
+		Asset->CheckerboardDimensions,
+		Asset->CheckerboardSize,
+		OutTransform);
+
 	if (Result == FCalibrator::ECalibrationResult::Success)
 	{
 		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
@@ -207,7 +212,7 @@ void FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed()
 	if (!Asset)
 		return;
 
-	CalibratorImpl->ResetCalibrationState(Asset);
+	CalibratorImpl->RestartCalibration();
 	ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
 }
 
@@ -238,17 +243,8 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 		InvalidateAllViewers();
 
 		// If target itself has changed, it may be different resolution, must also release transient resources
-		CalibratorImpl->ResetCalibrationState(Asset);
+		CalibratorImpl->RestartCalibration();
 		CalibratorImpl->ResetTransientResources();
-		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
-	}
-
-	// If only checkerboard parameters changed, we don't have to release transient resources
-	if (PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, CheckerboardDimensions)
-	 || PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, CheckerboardSize))
-	{
-		CalibratorImpl->ResetCalibrationState(Asset);
-		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
 	}
 }
 

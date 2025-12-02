@@ -51,17 +51,18 @@ public:
 	};
 
 public:
-	// Resets state to do with the asset or calibration process, but doesn't free transient resources.
-	// Use this when any asset state or calibration parameters are changed.
-	void ResetCalibrationState(TObjectPtr<UReprojectionCalibration> InAsset);
+	// Resets state to do with the calibration process, but doesn't free transient resources.
+	// Use this restart progressive calibration
+	void RestartCalibration();
 	// Releases transient resources so that they will be recreated next time calibration is performed.
 	// Use this only when the texture sizes of the input feeds change.
 	void ResetTransientResources();
 
-	// Ensure ResetCalibrationState has been called at least once before running calibration
 	ECalibrationResult RunCalibration(
 		TObjectPtr<UReprojectionCalibrationTargetBase> Source,
 		TObjectPtr<UReprojectionCalibrationTargetBase> Destination,
+		FIntPoint CheckerboardDimensions,
+		float CheckerboardSize,
 		FTransform& OutSourceToDestination
 	);
 
@@ -75,7 +76,7 @@ private:
 	static TObjectPtr<UTexture> GetDebugView(const FTransientResources& Resources);
 
 	static ECalibrationResult FindCheckerboardCorners(
-		TObjectPtr<UReprojectionCalibration> Asset,
+		FIntPoint CheckerboardDimensions,
 		TObjectPtr<UTexture> InTexture,
 		FTransientResources& Resources,
 		TArray<FVector2f>& OutCorners
@@ -86,12 +87,13 @@ private:
 	static UTextureRenderTarget2D* CreateRenderTargetFrom(TObjectPtr<UTexture> InTexture, bool bClearRenderTarget);
 
 private:
+	// Transient resources are stored as members to avoid re-allocation every run
 	TStaticArray<FTransientResources, Resources_Count> TransientResources;
 
-	TObjectPtr<UReprojectionCalibration> Asset;
+	// State for progressive calibration - where the calibration is refined over multiple runs
+	int32 NumRuns = 0;
+	double WeightSum = 0;
 
-	TArray<FVector2f> SourceCorners;
-	TArray<FVector2f> DestinationCorners;
-
-	TArray<FVector> ObjectPoints;
+	FQuat AccumulatedRotation = FQuat::Identity;
+	FVector AccumulatedTranslation = FVector::ZeroVector;
 };
