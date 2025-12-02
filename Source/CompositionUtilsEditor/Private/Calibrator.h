@@ -43,7 +43,9 @@ public:
 		Error_MissingSourceOrDestination,
 		Error_ReadTextureFailure,
 		Error_IdentifyCheckerboardFailure,
-		Error_DrawCheckerboardFailure
+		Error_PointCountMismatch,
+		Error_DrawCheckerboardFailure,
+		Error_SolvePoseFailure
 	};
 
 public:
@@ -57,7 +59,8 @@ public:
 	// Ensure ResetCalibrationState has been called at least once before running calibration
 	ECalibrationResult RunCalibration(
 		TObjectPtr<UTexture> Source,
-		TObjectPtr<UTexture> Destination
+		TObjectPtr<UTexture> Destination,
+		FTransform& OutSourceToDestination
 	);
 
 	TObjectPtr<UTexture> GetCalibratedSourceDebugView() const;
@@ -88,5 +91,5 @@ private:
 	TArray<FVector2f> SourceCorners;
 	TArray<FVector2f> DestinationCorners;
 
-	TArray<FVector3f> ObjectPoints;
+	TArray<FVector> ObjectPoints;
 };

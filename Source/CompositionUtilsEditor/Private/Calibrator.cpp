@@ -1,5 +1,6 @@
 #include "Calibrator.h"
 
+#include "CompositionUtilsEditor.h"
 #include "MediaTexture.h"
 #include "RenderGraphBuilder.h"
 #include "RenderGraphUtils.h"
@@ -24,11 +25,13 @@ void FCalibrator::ResetCalibrationState(TObjectPtr<UReprojectionCalibration> InA
 	}
 
 	const auto& Dims = Asset->CheckerboardDimensions;
-	ObjectPoints.Init({}, Dims.X * Dims.Y);
-	for (int32 X = 0; X < Dims.X; X++)
-	for (int32 Y = 0; Y < Dims.X; Y++)
+	ObjectPoints.Empty(Dims.X * Dims.Y);
+	for (int32 Y = 0; Y < Dims.Y; Y++)
 	{
-		ObjectPoints.Add(FVector3f{ X * Asset->CheckerboardSize, Y * Asset->CheckerboardSize, 0.0f });
+		for (int32 X = 0; X < Dims.X; X++)
+		{
+			ObjectPoints.Add(FVector{ 0.0, X * Asset->CheckerboardSize, Y * Asset->CheckerboardSize });
+		}
 	}
 }
 
@@ -42,7 +45,8 @@ void FCalibrator::ResetTransientResources()
 
 FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 	TObjectPtr<UTexture> Source, 
-	TObjectPtr<UTexture> Destination)
+	TObjectPtr<UTexture> Destination,
+	FTransform& OutSourceToDestination)
 {
 	// Owner of Calibrator should ALWAYS make sure ResetCalibrationState has been called before RunCalibration
 	check(Asset);
@@ -79,7 +83,45 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 		return Result;
 	}
 
+	if (SourceCorners.Num() != ObjectPoints.Num() || DestinationCorners.Num() != ObjectPoints.Num())
+	{
+		return ECalibrationResult::Error_PointCountMismatch;
+	}
+
 	// With checkerboard corners found, attempt to solve for the pose of each camera
+	FTransform SourceCameraPose, DestinationCameraPose;
+
+	FVector2D FocalLength{ 531.72, 531.72 };
+	FVector2D ImageCentre{ 613.57, 329.28 };
+	TArray<float> Distortion{ 0, 0, 0, 0, 0 };
+
+	if (!FOpenCVHelper::SolvePnP(
+		ObjectPoints,
+		SourceCorners,
+		FocalLength, ImageCentre, Distortion,
+		SourceCameraPose))
+	{
+		return ECalibrationResult::Error_SolvePoseFailure;
+	}
+
+	if (!FOpenCVHelper::SolvePnP(
+		ObjectPoints,
+		DestinationCorners,
+		FocalLength, ImageCentre, Distortion,
+		DestinationCameraPose))
+	{
+		return ECalibrationResult::Error_SolvePoseFailure;
+	}
+
+	// Find the transform to get from Source to Destination
+	FQuat SourceRotation = SourceCameraPose.GetRotation();
+	FQuat DestinationRotation = DestinationCameraPose.GetRotation();
+	FVector SourceTranslation = SourceCameraPose.GetTranslation();
+	FVector DestinationTranslation = DestinationCameraPose.GetTranslation();
+
+	OutSourceToDestination = FTransform::Identity;
+	OutSourceToDestination.SetRotation(DestinationRotation * SourceRotation.Inverse());
+	OutSourceToDestination.SetTranslation(DestinationTranslation - SourceTranslation);
 
 	return ECalibrationResult::Success;
 #else
@@ -243,8 +285,12 @@ FText FCalibrator::GetErrorTextForResult(ECalibrationResult Result)
 		return LOCTEXT("CalibrationResultReadTextureFailure", "Internal error: Failed to read data from texture.");
 	case ECalibrationResult::Error_IdentifyCheckerboardFailure:
 		return LOCTEXT("CalibrationResultIdentifyCheckerboardFailure", "Failed to identify checkerboard in either source feed, destination feed, or both. Please retry.");
+	case ECalibrationResult::Error_PointCountMismatch:
+		return LOCTEXT("CalibrationResultIdentifyCheckerboardFailure", "Number of points found did not match expected number of points. Please retry.");
 	case ECalibrationResult::Error_DrawCheckerboardFailure:
 		return LOCTEXT("CalibrationResultDrawCheckerboardFailure", "Internal error: Failed to draw debug checkerboard.");
+	case ECalibrationResult::Error_SolvePoseFailure:
+		return LOCTEXT("CalibrationResultSolvePoseFailure", "Failed to solve for camera pose. Please retry.");
 	}
 
 	checkNoEntry();

@@ -186,10 +186,14 @@ void FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed()
 	if (!ReprojectionCalibrationAsset)
 		return;
 
-	FCalibrator::ECalibrationResult Result = CalibratorImpl->RunCalibration(GetFeedSource(), GetFeedDestination());
+	FTransform OutTransform;
+	FCalibrator::ECalibrationResult Result = CalibratorImpl->RunCalibration(GetFeedSource(), GetFeedDestination(), OutTransform);
 	if (Result == FCalibrator::ECalibrationResult::Success)
 	{
 		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
+
+		ReprojectionCalibrationAsset->ExtrinsicTransform = OutTransform;
+		(void)ReprojectionCalibrationAsset->MarkPackageDirty();
 	}
 	else
 	{
