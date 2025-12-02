@@ -4,6 +4,7 @@
 #include "Engine/TextureRenderTarget2D.h"
 
 class UReprojectionCalibration;
+class UReprojectionCalibrationTargetBase;
 
 /**
  * Contains utilities and owns transient resources required to perform calibration
@@ -41,6 +42,7 @@ public:
 		Error_NoOpenCV,
 		Error_InvalidParams,
 		Error_MissingSourceOrDestination,
+		Error_MissingIntrinsics,
 		Error_ReadTextureFailure,
 		Error_IdentifyCheckerboardFailure,
 		Error_PointCountMismatch,
@@ -58,8 +60,8 @@ public:
 
 	// Ensure ResetCalibrationState has been called at least once before running calibration
 	ECalibrationResult RunCalibration(
-		TObjectPtr<UTexture> Source,
-		TObjectPtr<UTexture> Destination,
+		TObjectPtr<UReprojectionCalibrationTargetBase> Source,
+		TObjectPtr<UReprojectionCalibrationTargetBase> Destination,
 		FTransform& OutSourceToDestination
 	);
 

@@ -2,6 +2,7 @@
 
 #include "CompUtilsViewExtension.h"
 #include "Components/SceneCaptureComponent2D.h"
+#include "CineCameraActor.h"
 
 #include "Pipelines/CompUtilsPipelines.h"
 
@@ -63,7 +64,8 @@ bool ACompositionUtilsCaptureBase::GetCameraIntrinsicData(FCompUtilsCameraIntrin
 	}
 
 	FMinimalViewInfo VirtualCameraView;
-	CameraActor->GetCameraComponent()->GetCameraView(0.0f, VirtualCameraView);
+	UCameraComponent* CameraComponent = CameraActor->GetCameraComponent();
+	CameraComponent->GetCameraView(0.0f, VirtualCameraView);
 
 	FMatrix ProjectionMatrix = VirtualCameraView.CalculateProjectionMatrix();
 
@@ -76,6 +78,15 @@ bool ACompositionUtilsCaptureBase::GetCameraIntrinsicData(FCompUtilsCameraIntrin
 	// Calculate vertical FOV from horizontal FOV
 	OutData.VerticalFOV =
 		2.0f * FMath::Atan(FMath::Tan(0.5f * OutData.HorizontalFOV) / VirtualCameraView.AspectRatio);
+
+	if (UCineCameraComponent* CineCameraComponent = Cast<UCineCameraComponent>(CameraComponent))
+	{
+		// TODO: Populate camera intrinsics
+	}
+	else
+	{
+		// Intrinsics will be unavailable
+	}
 
 	return true;
 }

@@ -26,7 +26,8 @@ public class CompositionUtils : ModuleRules
                 "Renderer",
                 "RHI",
                 "RHICore",
-                "MediaAssets"
+                "MediaAssets",
+                "CinematicCamera"
             }
 			);
 

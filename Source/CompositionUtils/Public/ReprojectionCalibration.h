@@ -3,14 +3,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "CompUtilsCameraInterface.h"
+
 #include "ReprojectionCalibration.generated.h"
 
 
 /**
  * Composition Utils: Base class for encapsulating a target for reprojection (either as a source or destination)
+ * Implements ICompUtilsCameraInterface, as a reprojection target must expose intrinsic properties of a camera
  */
 UCLASS(editinlinenew, Abstract)
-class COMPOSITIONUTILS_API UReprojectionCalibrationTargetBase : public UObject
+class COMPOSITIONUTILS_API UReprojectionCalibrationTargetBase : public UObject, public ICompUtilsCameraInterface
 {
 	GENERATED_BODY()
 public:

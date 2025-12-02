@@ -45,16 +45,29 @@ void FCalibrator::ResetTransientResources()
 }
 
 FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
-	TObjectPtr<UTexture> Source, 
-	TObjectPtr<UTexture> Destination,
+	TObjectPtr<UReprojectionCalibrationTargetBase> Source,
+	TObjectPtr<UReprojectionCalibrationTargetBase> Destination,
 	FTransform& OutSourceToDestination)
 {
 	// Owner of Calibrator should ALWAYS make sure ResetCalibrationState has been called before RunCalibration
 	check(Asset);
 
+	// Calibration relies on OpenCV to run
+#if WITH_OPENCV
 	if (!(Asset->CheckerboardDimensions.X > 0 && Asset->CheckerboardDimensions.Y > 0 && Asset->CheckerboardSize > 0.0f))	
 	{
 		return ECalibrationResult::Error_InvalidParams;
+	}
+
+	if (!Source || !Destination || !Source->GetTexture() || !Destination->GetTexture())
+	{
+		return ECalibrationResult::Error_MissingSourceOrDestination;
+	}
+
+	FCompUtilsCameraIntrinsicData SourceIntrinsics, DestinationIntrinsics;
+	if (!Source->GetCameraIntrinsicData(SourceIntrinsics) || !Destination->GetCameraIntrinsicData(DestinationIntrinsics))
+	{
+		return ECalibrationResult::Error_MissingIntrinsics;
 	}
 
 	for (auto& Resources : TransientResources)
@@ -62,21 +75,14 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 		Resources.bValidDebugView = false;
 	}
 
-	// Calibration relies on OpenCV to run
-#if WITH_OPENCV
-	if (!Source || !Destination)
-	{
-		return ECalibrationResult::Error_MissingSourceOrDestination;
-	}
-
 	// First, find checkerboard corners for the current pair of images
-	ECalibrationResult Result = FindCheckerboardCorners(Asset, Source, TransientResources[Resources_Source], SourceCorners);
+	ECalibrationResult Result = FindCheckerboardCorners(Asset, Source->GetTexture(), TransientResources[Resources_Source], SourceCorners);
 	if (Result != ECalibrationResult::Success)
 	{
 		return Result;
 	}
 
-	Result = FindCheckerboardCorners(Asset, Destination, TransientResources[Resources_Destination], DestinationCorners);
+	Result = FindCheckerboardCorners(Asset, Destination->GetTexture(), TransientResources[Resources_Destination], DestinationCorners);
 	if (Result != ECalibrationResult::Success)
 	{
 		// To make it less confusing, either show both successful debug images or neither
@@ -92,14 +98,12 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 	// With checkerboard corners found, attempt to solve for the pose of each camera
 	FTransform SourceCameraPose, DestinationCameraPose;
 
-	FVector2D FocalLength{ 531.72, 531.72 };
-	FVector2D ImageCentre{ 613.57, 329.28 };
-	TArray<float> Distortion{ 0, 0, 0, 0, 0 };
-
 	if (!FOpenCVHelper::SolvePnP(
 		ObjectPoints,
 		SourceCorners,
-		FocalLength, ImageCentre, Distortion,
+		SourceIntrinsics.FocalLength,
+		SourceIntrinsics.ImageCenter,
+		SourceIntrinsics.DistortionParams,
 		SourceCameraPose))
 	{
 		return ECalibrationResult::Error_SolvePoseFailure;
@@ -108,7 +112,9 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 	if (!FOpenCVHelper::SolvePnP(
 		ObjectPoints,
 		DestinationCorners,
-		FocalLength, ImageCentre, Distortion,
+		DestinationIntrinsics.FocalLength, 
+		DestinationIntrinsics.ImageCenter, 
+		DestinationIntrinsics.DistortionParams,
 		DestinationCameraPose))
 	{
 		return ECalibrationResult::Error_SolvePoseFailure;
@@ -282,6 +288,8 @@ FText FCalibrator::GetErrorTextForResult(ECalibrationResult Result)
 		return LOCTEXT("CalibrationResultInvalidParams", "Calibration Asset contains invalid parameters. Ensure checkerboard parameters are set correctly.");
 	case ECalibrationResult::Error_MissingSourceOrDestination:
 		return LOCTEXT("CalibrationResultMissingSourceOrDestination", "Source or Destination target feed was missing. Ensure a valid target is selected before calibration.");
+	case ECalibrationResult::Error_MissingIntrinsics:
+		return LOCTEXT("CalibrationResultMissingIntrinsics", "Source or Destination target feed did not supply camera intrinsics. Ensure a valid target is selected before calibration.");
 	case ECalibrationResult::Error_ReadTextureFailure:
 		return LOCTEXT("CalibrationResultReadTextureFailure", "Internal error: Failed to read data from texture.");
 	case ECalibrationResult::Error_IdentifyCheckerboardFailure:

@@ -15,7 +15,7 @@ const FName FReprojectionCalibrationEditorToolkit::ControlsTabId = "Reprojection
 
 void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& InObjects)
 {
-	ReprojectionCalibrationAsset = Cast<UReprojectionCalibration>(InObjects[0]);
+	Asset = Cast<UReprojectionCalibration>(InObjects[0]);
 
 	ReprojectionCalibrationViewers[Viewer_Feed] = SNew(SReprojectionCalibrationViewer)
 		.SourceTexture(this, &FReprojectionCalibrationEditorToolkit::GetFeedSource)
@@ -29,7 +29,7 @@ void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& I
 		.OnResetCalibrationPressed(this, &FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed);
 
 	CalibratorImpl = MakeUnique<FCalibrator>();
-	CalibratorImpl->ResetCalibrationState(ReprojectionCalibrationAsset);
+	CalibratorImpl->ResetCalibrationState(Asset);
 
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout_v3")
 	->AddArea(
@@ -138,7 +138,7 @@ TSharedRef<SDockTab> FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpaw
 	DetailsViewArgs.NameAreaSettings = FDetailsViewArgs::HideNameArea;
 
 	TSharedRef<IDetailsView> DetailsView = PropertyEditorModule.CreateDetailView(DetailsViewArgs);
-	DetailsView->SetObjects(TArray<UObject*>{ ReprojectionCalibrationAsset });
+	DetailsView->SetObjects(TArray<UObject*>{ Asset });
 	DetailsView->OnFinishedChangingProperties().AddSP(this, &FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback);
 
 	return SNew(SDockTab)
@@ -159,14 +159,14 @@ TSharedRef<SDockTab> FReprojectionCalibrationEditorToolkit::HandleTabSpawnerSpaw
 
 TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetFeedSource() const
 {
-	check(ReprojectionCalibrationAsset);
-	return ReprojectionCalibrationAsset->Source ? ReprojectionCalibrationAsset->Source->GetTexture() : nullptr;
+	check(Asset);
+	return Asset->Source ? Asset->Source->GetTexture() : nullptr;
 }
 
 TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetFeedDestination() const
 {
-	check(ReprojectionCalibrationAsset);
-	return ReprojectionCalibrationAsset->Destination ? ReprojectionCalibrationAsset->Destination->GetTexture() : nullptr;
+	check(Asset);
+	return Asset->Destination ? Asset->Destination->GetTexture() : nullptr;
 }
 
 TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetCalibrationImageSource() const
@@ -183,17 +183,17 @@ TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetCalibrationImageD
 
 void FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed()
 {
-	if (!ReprojectionCalibrationAsset)
+	if (!Asset)
 		return;
 
 	FTransform OutTransform;
-	FCalibrator::ECalibrationResult Result = CalibratorImpl->RunCalibration(GetFeedSource(), GetFeedDestination(), OutTransform);
+	FCalibrator::ECalibrationResult Result = CalibratorImpl->RunCalibration(Asset->Source, Asset->Destination, OutTransform);
 	if (Result == FCalibrator::ECalibrationResult::Success)
 	{
 		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
 
-		ReprojectionCalibrationAsset->ExtrinsicTransform = OutTransform;
-		(void)ReprojectionCalibrationAsset->MarkPackageDirty();
+		Asset->ExtrinsicTransform = OutTransform;
+		(void)Asset->MarkPackageDirty();
 	}
 	else
 	{
@@ -204,10 +204,10 @@ void FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed()
 
 void FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed()
 {
-	if (!ReprojectionCalibrationAsset)
+	if (!Asset)
 		return;
 
-	CalibratorImpl->ResetCalibrationState(ReprojectionCalibrationAsset);
+	CalibratorImpl->ResetCalibrationState(Asset);
 	ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
 }
 
@@ -220,7 +220,7 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 				   || PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, Destination);
 
 	// Check if inner members of Source or Destination were changed
-	if (ReprojectionCalibrationAsset && !bTargetChanged)
+	if (Asset && !bTargetChanged)
 	{
 		// Don't know type of abstract objects Source and Destination so cannot directly check members
 		// Invalidate brushes if any member variables of source or destination were changed is conservative
@@ -228,8 +228,8 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 		for (int32 Index = 0; Index < NumObjectsEdited; Index++)
 		{
 			const UObject* EditedObject = Event.GetObjectBeingEdited(Index);
-			bTargetChanged |= EditedObject == static_cast<const UObject*>(ReprojectionCalibrationAsset->Source)
-						   || EditedObject == static_cast<const UObject*>(ReprojectionCalibrationAsset->Destination);
+			bTargetChanged |= EditedObject == static_cast<const UObject*>(Asset->Source)
+						   || EditedObject == static_cast<const UObject*>(Asset->Destination);
 		}
 	}
 
@@ -238,7 +238,7 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 		InvalidateAllViewers();
 
 		// If target itself has changed, it may be different resolution, must also release transient resources
-		CalibratorImpl->ResetCalibrationState(ReprojectionCalibrationAsset);
+		CalibratorImpl->ResetCalibrationState(Asset);
 		CalibratorImpl->ResetTransientResources();
 		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
 	}
@@ -247,7 +247,7 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 	if (PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, CheckerboardDimensions)
 	 || PropertyName == GET_MEMBER_NAME_CHECKED(UReprojectionCalibration, CheckerboardSize))
 	{
-		CalibratorImpl->ResetCalibrationState(ReprojectionCalibrationAsset);
+		CalibratorImpl->ResetCalibrationState(Asset);
 		ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
 	}
 }

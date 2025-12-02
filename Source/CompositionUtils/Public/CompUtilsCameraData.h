@@ -31,4 +31,10 @@ struct COMPOSITIONUTILS_API FCompUtilsCameraIntrinsicData
 	// FOV is measured in radians
 	float HorizontalFOV = HALF_PI;
 	float VerticalFOV	= HALF_PI;
+
+	// Forms the 'camera matrix' of a physical camera lens
+	FVector2D FocalLength = FVector2D::ZeroVector;
+	FVector2D ImageCenter = FVector2D::ZeroVector;
+
+	TArray<float> DistortionParams;
 };
