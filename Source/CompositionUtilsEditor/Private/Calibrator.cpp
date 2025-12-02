@@ -24,13 +24,14 @@ void FCalibrator::ResetCalibrationState(TObjectPtr<UReprojectionCalibration> InA
 		Resources.bValidDebugView = false;
 	}
 
+	// TODO: Notes on coordinate space
 	const auto& Dims = Asset->CheckerboardDimensions;
 	ObjectPoints.Empty(Dims.X * Dims.Y);
 	for (int32 Y = 0; Y < Dims.Y; Y++)
 	{
 		for (int32 X = 0; X < Dims.X; X++)
 		{
-			ObjectPoints.Add(FVector{ 0.0, X * Asset->CheckerboardSize, Y * Asset->CheckerboardSize });
+			ObjectPoints.Add(FVector{ X * Asset->CheckerboardSize, Y * Asset->CheckerboardSize, 0.0 });
 		}
 	}
 }
@@ -120,8 +121,8 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 	FVector DestinationTranslation = DestinationCameraPose.GetTranslation();
 
 	OutSourceToDestination = FTransform::Identity;
-	OutSourceToDestination.SetRotation(DestinationRotation * SourceRotation.Inverse());
-	OutSourceToDestination.SetTranslation(DestinationTranslation - SourceTranslation);
+	OutSourceToDestination.SetRotation(SourceRotation * DestinationRotation.Inverse());
+	OutSourceToDestination.SetTranslation(SourceTranslation - DestinationTranslation);
 
 	return ECalibrationResult::Success;
 #else
