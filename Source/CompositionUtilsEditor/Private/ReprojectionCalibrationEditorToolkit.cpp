@@ -213,7 +213,8 @@ void FReprojectionCalibrationEditorToolkit::RunCalibration()
 			CalibratorImpl->GetNumSamples(),
 			CalibratorImpl->GetCurrentSourceError(),
 			CalibratorImpl->GetCurrentDestError(),
-			CalibratorImpl->GetCurrentCalibratedTransform()
+			CalibratorImpl->GetCurrentCalibratedTransform(),
+			CalibratorImpl->GetCurrentSampleWeight()
 		);
 	}
 	else

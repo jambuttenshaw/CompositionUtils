@@ -75,6 +75,7 @@ public:
 
 	inline double GetCurrentSourceError() const { return CurrentSourceError; }
 	inline double GetCurrentDestError() const { return CurrentDestinationError; }
+	inline double GetCurrentSampleWeight() const { return CurrentSampleWeight; }
 	inline const FTransform& GetCurrentCalibratedTransform() const { return CurrentCalibratedTransform; }
 
 	static FText GetErrorTextForResult(ECalibrationResult Result);
@@ -117,5 +118,6 @@ private:
 	// The properties of the most recent calibration run
 	double CurrentSourceError = 0;
 	double CurrentDestinationError = 0;
+	double CurrentSampleWeight = 0;
 	FTransform CurrentCalibratedTransform = FTransform::Identity;
 };

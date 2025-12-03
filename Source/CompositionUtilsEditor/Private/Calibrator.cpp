@@ -24,6 +24,7 @@ void FCalibrator::RestartCalibration()
 
 	CurrentSourceError = 0;
 	CurrentDestinationError = 0;
+	CurrentSampleWeight = 0;
 	CurrentCalibratedTransform.SetIdentity();
 
 	// It is helpful to clear any debug views from previous runs when calibration is restarted
@@ -166,10 +167,11 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibrationImpl(
 	// Error should never be 0 in reality
 	double Weight = 1.0 / FMath::Max(UE_KINDA_SMALL_NUMBER, CurrentSourceError + CurrentDestinationError);
 	WeightSum += Weight;
-	double NormalizedWeight = Weight / WeightSum;
+	// Normalize weight across samples
+	CurrentSampleWeight = Weight / WeightSum;
 
-	AccumulatedRotation = FQuat::Slerp(AccumulatedRotation, SourceToDestinationRotation, NormalizedWeight);
-	AccumulatedTranslation = FMath::Lerp(AccumulatedTranslation, SourceToDestinationTranslation, NormalizedWeight);
+	AccumulatedRotation = FQuat::Slerp(AccumulatedRotation, SourceToDestinationRotation, CurrentSampleWeight);
+	AccumulatedTranslation = FMath::Lerp(AccumulatedTranslation, SourceToDestinationTranslation, CurrentSampleWeight);
 
 	NumSamples++;
 	SourceErrorSum += CurrentSourceError;

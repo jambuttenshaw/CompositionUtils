@@ -24,7 +24,7 @@ public:
 
 	void Construct(const FArguments& InArgs);
 
-	void AddSuccessToLog(int32 SampleIndex, double SourceError, double DestError, const FTransform& CalibratedTransform) const;
+	void AddSuccessToLog(int32 SampleIndex, double SourceError, double DestError, const FTransform& CalibratedTransform, double Weight) const;
 	void AddErrorToLog(const FText& ErrorText) const;
 	void AddToLog(const TSharedPtr<SWidget>& Widget) const;
 	void ClearLog() const;

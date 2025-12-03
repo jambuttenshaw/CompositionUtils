@@ -148,7 +148,7 @@ void SReprojectionCalibrationControls::Construct(const FArguments& InArgs)
 	];
 }
 
-void SReprojectionCalibrationControls::AddSuccessToLog(int32 SampleIndex, double SourceError, double DestError, const FTransform& CalibratedTransform) const
+void SReprojectionCalibrationControls::AddSuccessToLog(int32 SampleIndex, double SourceError, double DestError, const FTransform& CalibratedTransform, double Weight) const
 {
 	FVector Translation = CalibratedTransform.GetTranslation();
 	FVector Rotation = CalibratedTransform.GetRotation().Euler();
@@ -165,12 +165,14 @@ void SReprojectionCalibrationControls::AddSuccessToLog(int32 SampleIndex, double
 			"	Error (Destination): {2}\n"
 			"	Translation: ({3}, {4}, {5})\n"
 			"	Rotation: ({6}, {7}, {8})\n"
+			"	Weight: {9}\n"
 			),
 			FText::AsNumber(SampleIndex, &Options),
 			FText::AsNumber(SourceError, &Options),
 			FText::AsNumber(DestError, &Options),
 			FText::AsNumber(Translation.X, &Options), FText::AsNumber(Translation.Y, &Options), FText::AsNumber(Translation.Z, &Options),
-			FText::AsNumber(Rotation.X, &Options), FText::AsNumber(Rotation.Y, &Options), FText::AsNumber(Rotation.Z, &Options)
+			FText::AsNumber(Rotation.X, &Options), FText::AsNumber(Rotation.Y, &Options), FText::AsNumber(Rotation.Z, &Options),
+			FText::AsNumber(Weight, &Options)
 			))
 	);
 }
