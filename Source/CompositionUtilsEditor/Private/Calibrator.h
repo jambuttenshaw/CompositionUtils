@@ -69,10 +69,25 @@ public:
 	TObjectPtr<UTexture> GetCalibratedSourceDebugView() const;
 	TObjectPtr<UTexture> GetCalibratedDestinationDebugView() const;
 
+	inline int32 GetNumSamples() const { return NumSamples; }
+	inline double GetAvgSourceError() const { return NumSamples == 0 ? 0 : SourceErrorSum / static_cast<double>(NumSamples); }
+	inline double GetAvgDestError() const { return NumSamples == 0 ? 0 : DestinationErrorSum / static_cast<double>(NumSamples); }
+
+	inline double GetCurrentSourceError() const { return CurrentSourceError; }
+	inline double GetCurrentDestError() const { return CurrentDestinationError; }
+	inline const FTransform& GetCurrentCalibratedTransform() const { return CurrentCalibratedTransform; }
 
 	static FText GetErrorTextForResult(ECalibrationResult Result);
 
 private:
+	ECalibrationResult RunCalibrationImpl(
+		TObjectPtr<UReprojectionCalibrationTargetBase> Source,
+		TObjectPtr<UReprojectionCalibrationTargetBase> Destination,
+		FIntPoint CheckerboardDimensions,
+		float CheckerboardSize,
+		FTransform& OutSourceToDestination
+	);
+
 	static TObjectPtr<UTexture> GetDebugView(const FTransientResources& Resources);
 
 	static ECalibrationResult FindCheckerboardCorners(
@@ -91,9 +106,16 @@ private:
 	TStaticArray<FTransientResources, Resources_Count> TransientResources;
 
 	// State for progressive calibration - where the calibration is refined over multiple runs
-	int32 NumRuns = 0;
+	int32 NumSamples = 0;
 	double WeightSum = 0;
+	double SourceErrorSum = 0;
+	double DestinationErrorSum = 0;
 
 	FQuat AccumulatedRotation = FQuat::Identity;
 	FVector AccumulatedTranslation = FVector::ZeroVector;
+
+	// The properties of the most recent calibration run
+	double CurrentSourceError = 0;
+	double CurrentDestinationError = 0;
+	FTransform CurrentCalibratedTransform = FTransform::Identity;
 };

@@ -14,11 +14,17 @@
 
 void FCalibrator::RestartCalibration()
 {
-	NumRuns = 0;
+	NumSamples = 0;
 	WeightSum = 0;
+	SourceErrorSum = 0;
+	DestinationErrorSum = 0;
 
 	AccumulatedRotation = FQuat::Identity;
 	AccumulatedTranslation = FVector::ZeroVector;
+
+	CurrentSourceError = 0;
+	CurrentDestinationError = 0;
+	CurrentCalibratedTransform.SetIdentity();
 
 	// It is helpful to clear any debug views from previous runs when calibration is restarted
 	for (auto& Resources : TransientResources)
@@ -36,6 +42,37 @@ void FCalibrator::ResetTransientResources()
 }
 
 FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
+	TObjectPtr<UReprojectionCalibrationTargetBase> Source,
+	TObjectPtr<UReprojectionCalibrationTargetBase> Destination,
+	FIntPoint CheckerboardDimensions,
+	float CheckerboardSize,
+	FTransform& OutSourceToDestination)
+{
+	for (auto& Resources : TransientResources)
+	{
+		Resources.bValidDebugView = false;
+	}
+
+	ECalibrationResult Result = RunCalibrationImpl(
+		Source,
+		Destination,
+		CheckerboardDimensions,
+		CheckerboardSize,
+		OutSourceToDestination);
+
+	if (Result != ECalibrationResult::Success)
+	{
+		// To make it less confusing, either show both successful debug images or neither
+		for (auto& Resources : TransientResources)
+		{
+			Resources.bValidDebugView = false;
+		}
+	}
+
+	return Result;
+}
+
+FCalibrator::ECalibrationResult FCalibrator::RunCalibrationImpl(
 	TObjectPtr<UReprojectionCalibrationTargetBase> Source,
 	TObjectPtr<UReprojectionCalibrationTargetBase> Destination,
 	FIntPoint CheckerboardDimensions,
@@ -74,11 +111,6 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 		}
 	}
 
-	for (auto& Resources : TransientResources)
-	{
-		Resources.bValidDebugView = false;
-	}
-
 	// First, find checkerboard corners for the current pair of images
 	TArray<FVector2f> SourceCorners, DestinationCorners;
 	ECalibrationResult Result = FindCheckerboardCorners(CheckerboardDimensions, Source->GetTexture(), TransientResources[Resources_Source], SourceCorners);
@@ -90,8 +122,6 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 	Result = FindCheckerboardCorners(CheckerboardDimensions, Destination->GetTexture(), TransientResources[Resources_Destination], DestinationCorners);
 	if (Result != ECalibrationResult::Success)
 	{
-		// To make it less confusing, either show both successful debug images or neither
-		TransientResources[Resources_Source].bValidDebugView = false;
 		return Result;
 	}
 
@@ -130,22 +160,26 @@ FCalibrator::ECalibrationResult FCalibrator::RunCalibration(
 	FVector SourceToDestinationTranslation = SourceCameraPose.GetTranslation() - DestinationCameraPose.GetTranslation();
 
 	// Weight and accumulate output transform
-	double SourceError = FOpenCVHelper::ComputeReprojectionError(ObjectPoints, SourceCorners, SourceIntrinsics.FocalLength, SourceIntrinsics.ImageCenter, SourceCameraPose);
-	double DestinationError = FOpenCVHelper::ComputeReprojectionError(ObjectPoints, DestinationCorners, DestinationIntrinsics.FocalLength, DestinationIntrinsics.ImageCenter, DestinationCameraPose);
+	CurrentSourceError = FOpenCVHelper::ComputeReprojectionError(ObjectPoints, SourceCorners, SourceIntrinsics.FocalLength, SourceIntrinsics.ImageCenter, SourceCameraPose);
+	CurrentDestinationError = FOpenCVHelper::ComputeReprojectionError(ObjectPoints, DestinationCorners, DestinationIntrinsics.FocalLength, DestinationIntrinsics.ImageCenter, DestinationCameraPose);
 
 	// Error should never be 0 in reality
-	double Weight = 1.0 / FMath::Max(UE_KINDA_SMALL_NUMBER, SourceError + DestinationError);
+	double Weight = 1.0 / FMath::Max(UE_KINDA_SMALL_NUMBER, CurrentSourceError + CurrentDestinationError);
 	WeightSum += Weight;
 	double NormalizedWeight = Weight / WeightSum;
 
 	AccumulatedRotation = FQuat::Slerp(AccumulatedRotation, SourceToDestinationRotation, NormalizedWeight);
 	AccumulatedTranslation = FMath::Lerp(AccumulatedTranslation, SourceToDestinationTranslation, NormalizedWeight);
 
-	NumRuns++;
+	NumSamples++;
+	SourceErrorSum += CurrentSourceError;
+	DestinationErrorSum += CurrentDestinationError;
 
-	OutSourceToDestination.SetIdentity();
-	OutSourceToDestination.SetRotation(AccumulatedRotation);
-	OutSourceToDestination.SetTranslation(AccumulatedTranslation);
+	CurrentCalibratedTransform.SetIdentity();
+	CurrentCalibratedTransform.SetRotation(AccumulatedRotation);
+	CurrentCalibratedTransform.SetTranslation(AccumulatedTranslation);
+
+	OutSourceToDestination = CurrentCalibratedTransform;
 
 	return ECalibrationResult::Success;
 #else

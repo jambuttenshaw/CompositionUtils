@@ -33,8 +33,9 @@ private:
 	TObjectPtr<UTexture> GetCalibrationImageSource() const;
 	TObjectPtr<UTexture> GetCalibrationImageDestination() const;
 
-	void OnCaptureImagePressed();
-	void OnResetCalibrationPressed();
+	void RunCalibration();		// Performs a single run of calibration, and accumulates with previous runs if any.
+	void RestartCalibration();	// Restarts progressive calibration but does not clear data
+	void ResetCalibration();	// Restarts calibration AND ALSO clears all calibrated data
 
 	void OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const;
 

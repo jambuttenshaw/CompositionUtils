@@ -42,10 +42,12 @@ public:
 	UPROPERTY(EditAnywhere, Instanced, BlueprintReadOnly, Category = "Calibration", meta = (ShowOnlyInnerProperties))
 	TObjectPtr<UReprojectionCalibrationTargetBase> Destination;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Calibration")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Calibration", DisplayName = "Num Checkerboard Vertices", 
+		meta = (ToolTip = "The number of inisde corners on each axis of the checkerboard. E.g. a conventional chessboard is 7x7."))
 	FIntPoint CheckerboardDimensions;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Calibration")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Calibration", DisplayName = "Checkerboard Size (cm)",
+		meta = (ToolTip = "The side length of each square in the checkerboard, measured in centimetres. E.g. a checkerboard with squares 25mm in side length would be 2.5."))
 	float CheckerboardSize;
 };
 

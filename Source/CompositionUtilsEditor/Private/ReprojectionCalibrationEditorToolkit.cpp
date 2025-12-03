@@ -16,6 +16,7 @@ const FName FReprojectionCalibrationEditorToolkit::ControlsTabId = "Reprojection
 void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& InObjects)
 {
 	Asset = Cast<UReprojectionCalibration>(InObjects[0]);
+	CalibratorImpl = MakeUnique<FCalibrator>();
 
 	ReprojectionCalibrationViewers[Viewer_Feed] = SNew(SReprojectionCalibrationViewer)
 		.SourceTexture(this, &FReprojectionCalibrationEditorToolkit::GetFeedSource)
@@ -25,10 +26,18 @@ void FReprojectionCalibrationEditorToolkit::InitEditor(const TArray<UObject*>& I
 		.DestinationTexture(this, &FReprojectionCalibrationEditorToolkit::GetCalibrationImageDestination);
 
 	ReprojectionCalibrationControls = SNew(SReprojectionCalibrationControls)
-		.OnCaptureImagePressed(this, &FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed)
-		.OnResetCalibrationPressed(this, &FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed);
-
-	CalibratorImpl = MakeUnique<FCalibrator>();
+		.GetNumRunsText_Lambda(
+			[this](){ return FText::AsNumber(this->CalibratorImpl->GetNumSamples()); }
+		)
+		.GetAvgDestErrorText_Lambda(
+			[this](){ return FText::AsNumber(this->CalibratorImpl->GetAvgSourceError()); }
+		)
+		.GetAvgSourceErrorText_Lambda(
+			[this](){ return FText::AsNumber(this->CalibratorImpl->GetAvgDestError()); }
+		)
+		.OnCaptureClicked(this, &FReprojectionCalibrationEditorToolkit::RunCalibration)
+		.OnRestartClicked(this, &FReprojectionCalibrationEditorToolkit::RestartCalibration)
+		.OnResetClicked(this, &FReprojectionCalibrationEditorToolkit::ResetCalibration);
 
 	const TSharedRef<FTabManager::FLayout> Layout = FTabManager::NewLayout("ReprojectionCalibrationEditorLayout_v3")
 	->AddArea(
@@ -180,14 +189,14 @@ TObjectPtr<UTexture> FReprojectionCalibrationEditorToolkit::GetCalibrationImageD
 	return CalibratedDestination ? CalibratedDestination : GetFeedDestination();
 }
 
-void FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed()
+void FReprojectionCalibrationEditorToolkit::RunCalibration()
 {
 	if (!Asset)
 		return;
 
 	FTransform OutTransform;
 	FCalibrator::ECalibrationResult Result = CalibratorImpl->RunCalibration(
-		Asset->Source, 
+		Asset->Source,
 		Asset->Destination,
 		Asset->CheckerboardDimensions,
 		Asset->CheckerboardSize,
@@ -199,21 +208,40 @@ void FReprojectionCalibrationEditorToolkit::OnCaptureImagePressed()
 
 		Asset->ExtrinsicTransform = OutTransform;
 		(void)Asset->MarkPackageDirty();
+
+		ReprojectionCalibrationControls->AddSuccessToLog(
+			CalibratorImpl->GetNumSamples(),
+			CalibratorImpl->GetCurrentSourceError(),
+			CalibratorImpl->GetCurrentDestError(),
+			CalibratorImpl->GetCurrentCalibratedTransform()
+		);
 	}
 	else
 	{
-		FText ErrorMessage = FCalibrator::GetErrorTextForResult(Result);
-		UE_LOG(LogCompositionUtilsEditor, Error, TEXT("Calibration Error: %s"), *ErrorMessage.ToString())
+		ReprojectionCalibrationControls->AddErrorToLog(FCalibrator::GetErrorTextForResult(Result));
 	}
 }
 
-void FReprojectionCalibrationEditorToolkit::OnResetCalibrationPressed()
+void FReprojectionCalibrationEditorToolkit::RestartCalibration()
 {
 	if (!Asset)
 		return;
 
 	CalibratorImpl->RestartCalibration();
 	ReprojectionCalibrationViewers[Viewer_CalibrationImage]->InvalidateBrushes();
+
+	ReprojectionCalibrationControls->ClearLog();
+}
+
+void FReprojectionCalibrationEditorToolkit::ResetCalibration()
+{
+	if (!Asset)
+		return;
+
+	RestartCalibration();
+
+	Asset->ExtrinsicTransform = FTransform::Identity;
+	(void)Asset->MarkPackageDirty();
 }
 
 void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback(const FPropertyChangedEvent& Event) const
@@ -245,6 +273,8 @@ void FReprojectionCalibrationEditorToolkit::OnPropertiesFinishedChangingCallback
 		// If target itself has changed, it may be different resolution, must also release transient resources
 		CalibratorImpl->RestartCalibration();
 		CalibratorImpl->ResetTransientResources();
+
+		ReprojectionCalibrationControls->ClearLog();
 	}
 }
 
